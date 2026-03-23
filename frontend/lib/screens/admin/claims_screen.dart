@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
 import '../../services/reimbursement_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ClaimsScreen extends StatefulWidget {
   const ClaimsScreen({super.key});
@@ -370,6 +371,51 @@ class _ClaimCard extends StatelessWidget {
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (claim['receipt_url'] != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: kOffWhite,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.attach_file, size: 12, color: kTealGray),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Receipt attached',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      color: kTealGray,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      final url = claim['receipt_url'] as String;
+                      final uri = Uri.parse(url);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
+                    child: Text(
+                      'View',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: kDeepBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
           if (onApprove != null) ...[

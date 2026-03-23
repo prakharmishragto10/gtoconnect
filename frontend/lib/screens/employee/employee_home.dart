@@ -71,7 +71,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
                 ),
               ),
               TextSpan(
-                text: 'Portal',
+                text: 'Connect',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,

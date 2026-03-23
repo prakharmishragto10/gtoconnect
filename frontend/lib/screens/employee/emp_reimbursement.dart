@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/colors.dart';
 import '../../models/user.dart';
 import '../../services/reimbursement_service.dart';
+import '../../services/api.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EmpReimbursement extends StatefulWidget {
   final UserModel user;
@@ -15,11 +18,14 @@ class EmpReimbursement extends StatefulWidget {
 class _EmpReimbursementState extends State<EmpReimbursement> {
   bool _showForm = false;
   bool _submitting = false;
+  bool _uploading = false;
   bool _loading = true;
 
   final _amountCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   String _selectedCategory = 'Sales Travel';
+  String? _receiptUrl;
+  String? _receiptFileName;
 
   List<Map<String, dynamic>> _claims = [];
 
@@ -50,8 +56,47 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
     }
   }
 
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 1280,
+    );
+    if (picked == null) return;
+
+    setState(() => _uploading = true);
+
+    try {
+      final bytes = await picked.readAsBytes();
+      final fileName = picked.name;
+      final mime = 'image/${fileName.split('.').last}';
+
+      final result = await Api.uploadFile('/api/upload', bytes, fileName, mime);
+
+      setState(() {
+        _receiptUrl = result['url'];
+        _receiptFileName = fileName;
+        _uploading = false;
+      });
+
+      _showSnack('Receipt uploaded ✓', kForest);
+    } catch (e) {
+      setState(() => _uploading = false);
+      _showSnack(e.toString().replaceAll('Exception: ', ''), kDanger);
+    }
+  }
+
   Future<void> _submitClaim() async {
-    if (_amountCtrl.text.isEmpty || _descCtrl.text.isEmpty) return;
+    if (_amountCtrl.text.isEmpty || _descCtrl.text.isEmpty) {
+      _showSnack('Please fill all fields', kDanger);
+      return;
+    }
+    if (_receiptUrl == null) {
+      _showSnack('Receipt photo is required', kDanger);
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -59,36 +104,34 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
         category: _selectedCategory,
         amount: double.tryParse(_amountCtrl.text) ?? 0,
         description: _descCtrl.text,
+        receiptUrl: _receiptUrl!,
       );
       setState(() {
         _claims.insert(0, Map<String, dynamic>.from(claim));
         _submitting = false;
         _showForm = false;
+        _receiptUrl = null;
+        _receiptFileName = null;
         _amountCtrl.clear();
         _descCtrl.clear();
       });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Claim submitted successfully',
-            style: GoogleFonts.plusJakartaSans(fontSize: 13),
-          ),
-          backgroundColor: kForest,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      _showSnack('Claim submitted successfully', kForest);
     } catch (e) {
       setState(() => _submitting = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: kDanger,
-        ),
-      );
+      _showSnack(e.toString().replaceAll('Exception: ', ''), kDanger);
     }
+  }
+
+  void _showSnack(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   @override
@@ -209,7 +252,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
           ),
           const SizedBox(height: 16),
 
-          // New claim form
+          // Form
           if (_showForm) ...[
             Container(
               padding: const EdgeInsets.all(16),
@@ -308,40 +351,81 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
                   ),
                   const SizedBox(height: 12),
 
-                  _FormLabel('Receipt'),
+                  // Receipt upload
+                  _FormLabel('Receipt Photo *'),
                   const SizedBox(height: 6),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      color: kOffWhite,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: kBorder),
-                    ),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.upload_file_outlined,
-                          size: 28,
-                          color: kBlueGray,
+                  GestureDetector(
+                    onTap: _uploading ? null : _pickAndUploadImage,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      decoration: BoxDecoration(
+                        color: _receiptUrl != null ? kSuccessBg : kOffWhite,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _receiptUrl != null ? kForest : kBorder,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Tap to upload receipt photo',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            color: kTealGray,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          'JPG, PNG — max 5MB',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            color: kBlueGray,
-                          ),
-                        ),
-                      ],
+                      ),
+                      child: _uploading
+                          ? const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: kDeepBlue,
+                                ),
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                Icon(
+                                  _receiptUrl != null
+                                      ? Icons.check_circle_outline
+                                      : Icons.upload_file_outlined,
+                                  size: 28,
+                                  color: _receiptUrl != null
+                                      ? kForest
+                                      : kBlueGray,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _receiptUrl != null
+                                      ? _receiptFileName ?? 'Receipt uploaded ✓'
+                                      : 'Tap to upload receipt photo',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    color: _receiptUrl != null
+                                        ? kForest
+                                        : kTealGray,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (_receiptUrl == null)
+                                  Text(
+                                    'JPG, PNG — max 5MB',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10,
+                                      color: kBlueGray,
+                                    ),
+                                  ),
+                                if (_receiptUrl != null)
+                                  GestureDetector(
+                                    onTap: () => setState(() {
+                                      _receiptUrl = null;
+                                      _receiptFileName = null;
+                                    }),
+                                    child: Text(
+                                      'Remove',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 10,
+                                        color: kDanger,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -691,6 +775,26 @@ class _ClaimCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      final url = claim['receipt_url'] as String;
+                      final uri = Uri.parse(url);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(
+                          uri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
+                    child: Text(
+                      'View',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        color: kDeepBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   Text(
                     'View',
                     style: GoogleFonts.plusJakartaSans(

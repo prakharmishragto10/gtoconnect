@@ -31,9 +31,7 @@ class LocationService {
   static Future<void> _sendLocation() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
+        desiredAccuracy: LocationAccuracy.high,
       );
       await updateLocation(pos.latitude, pos.longitude);
     } catch (e) {

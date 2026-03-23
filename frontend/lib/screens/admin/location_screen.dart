@@ -246,7 +246,7 @@ class _LocationScreenState extends State<LocationScreen> {
                   TileLayer(
                     urlTemplate:
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.gto.portal',
+                    userAgentPackageName: 'com.gto.connect',
                   ),
                   // Employee markers
                   MarkerLayer(markers: markers),

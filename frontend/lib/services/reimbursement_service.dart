@@ -18,6 +18,7 @@ class ReimbursementService {
     required String category,
     required double amount,
     required String description,
+    required String receiptUrl,
   }) async {
     final data = await Api.post(
       '/api/reimbursements',
@@ -25,6 +26,7 @@ class ReimbursementService {
         'category': category,
         'amount': amount,
         'description': description,
+        'receipt_url': receiptUrl,
       },
     );
     return data['reimbursement'];

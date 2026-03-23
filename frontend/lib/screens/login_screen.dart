@@ -65,36 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               children: [
                 // ── Logo ──
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'GTO',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '.',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          color: kBlueGray,
-                        ),
-                      ),
-                      TextSpan(
-                        text: 'Portal',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Image.asset('assets/logo.png', height: 60),
                 const SizedBox(height: 6),
                 Text(
                   'WORKFORCE MANAGEMENT',

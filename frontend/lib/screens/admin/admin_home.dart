@@ -74,7 +74,7 @@ class _AdminHomeState extends State<AdminHome> {
                 ),
               ),
               TextSpan(
-                text: 'Portal',
+                text: 'Connect',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
