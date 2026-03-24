@@ -5,6 +5,7 @@ import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin/admin_home.dart';
 import 'screens/employee/employee_home.dart';
+import 'screens/subadmin/subadmin_home.dart';
 
 void main() {
   runApp(const GTOPortalApp());
@@ -57,8 +58,11 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                user.isAdmin ? AdminHome(user: user) : EmployeeHome(user: user),
+            builder: (_) {
+              if (user.isAdmin) return AdminHome(user: user);
+              if (user.isSubAdmin) return SubAdminHome(user: user);
+              return EmployeeHome(user: user);
+            },
           ),
         );
         return;

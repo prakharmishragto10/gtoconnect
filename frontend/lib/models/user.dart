@@ -20,6 +20,7 @@ class UserModel {
   });
 
   bool get isAdmin => role == 'admin';
+  bool get isSubAdmin => role == 'subadmin';
 
   factory UserModel.fromJson(Map<String, dynamic> j) => UserModel(
     id: j['id'],

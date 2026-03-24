@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../models/user.dart';
 import 'admin/admin_home.dart';
 import 'employee/employee_home.dart';
+import 'subadmin/subadmin_home.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,8 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              user.isAdmin ? AdminHome(user: user) : EmployeeHome(user: user),
+          builder: (_) {
+            if (user.isAdmin) return AdminHome(user: user);
+            if (user.isSubAdmin) return SubAdminHome(user: user);
+            return EmployeeHome(user: user);
+          },
         ),
       );
     } catch (e) {
@@ -57,15 +61,14 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kDeepBlue,
+      backgroundColor: Colors.white, // ✅ changed
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               children: [
-                // ── Logo ──
-                Image.asset('assets/logo.png', height: 60),
+                Image.asset('assets/gto.png', height: 150),
                 const SizedBox(height: 6),
                 Text(
                   'WORKFORCE MANAGEMENT',
@@ -78,12 +81,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 36),
 
-                // ── Card ──
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(26),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: kDeepBlue, // ✅ card color
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
@@ -94,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
-                          color: kDeepBlue,
+                          color: Colors.white, // ✅ changed
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -102,12 +104,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Enter your credentials to continue',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
-                          color: kTealGray,
+                          color: kBlueGray, // ✅ changed
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      // Email
                       _Label('Email'),
                       const SizedBox(height: 6),
                       _Input(
@@ -117,7 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Password
                       _Label('Password'),
                       const SizedBox(height: 6),
                       _Input(
@@ -136,7 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      // Error
                       if (_error != null) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -173,15 +172,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 22),
 
-                      // Sign in button
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
                           onPressed: _loading ? null : _login,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kDeepBlue,
-                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white,
+                            foregroundColor: kDeepBlue,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -193,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Colors.white,
+                                    color: kDeepBlue, // ✅ changed
                                   ),
                                 )
                               : Text(
@@ -208,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 20),
 
-                      // Demo accounts
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -229,6 +226,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 8),
                             _demoTile('barun@gto.com', 'Barun Gulati', 'Admin'),
+                            _demoTile(
+                              'suhanigulati@gto.com',
+                              'Suhani Gulati',
+                              'Finance',
+                            ),
                             _demoTile(
                               'prakhar@gto.com',
                               'Prakhar Mishra',
@@ -327,18 +329,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ── Shared widgets ──────────────────────────────────────
-
 class _Label extends StatelessWidget {
   final String text;
   const _Label(this.text);
+
   @override
   Widget build(BuildContext context) => Text(
     text,
     style: GoogleFonts.plusJakartaSans(
       fontSize: 11,
       fontWeight: FontWeight.w700,
-      color: kTealGray,
+      color: Colors.white70, // ✅ changed
       letterSpacing: 0.4,
     ),
   );
@@ -367,7 +368,10 @@ class _Input extends StatelessWidget {
     style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kDeepBlue),
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13, color: kBlueGray),
+      hintStyle: GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        color: kTealGray,
+      ), // ✅ changed
       suffixIcon: suffix,
       filled: true,
       fillColor: kOffWhite,
