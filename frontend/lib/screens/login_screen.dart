@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // ✅ changed
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -85,8 +85,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(26),
                   decoration: BoxDecoration(
-                    color: kDeepBlue, // ✅ card color
+                    color: kDeepBlue,
                     borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white, // ✅ changed
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -104,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Enter your credentials to continue',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
-                          color: kBlueGray, // ✅ changed
+                          color: kBlueGray,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -180,19 +187,33 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             foregroundColor: kDeepBlue,
-                            elevation: 0,
+                            elevation: 2,
+                            shadowColor: Colors.black.withOpacity(0.2),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
                           child: _loading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: kDeepBlue, // ✅ changed
-                                  ),
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: kDeepBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Signing in...',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 )
                               : Text(
                                   'Sign In',
@@ -339,7 +360,7 @@ class _Label extends StatelessWidget {
     style: GoogleFonts.plusJakartaSans(
       fontSize: 11,
       fontWeight: FontWeight.w700,
-      color: Colors.white70, // ✅ changed
+      color: Colors.white70,
       letterSpacing: 0.4,
     ),
   );
@@ -368,25 +389,22 @@ class _Input extends StatelessWidget {
     style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kDeepBlue),
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.plusJakartaSans(
-        fontSize: 13,
-        color: kTealGray,
-      ), // ✅ changed
+      hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTealGray),
       suffixIcon: suffix,
       filled: true,
       fillColor: kOffWhite,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: kBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: kBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: kTealGray, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: kDeepBlue, width: 1.6),
       ),
     ),
   );
