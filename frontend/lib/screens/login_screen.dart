@@ -2,10 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/colors.dart';
 import '../services/auth_service.dart';
-import '../models/user.dart';
 import 'admin/admin_home.dart';
 import 'employee/employee_home.dart';
 import 'subadmin/subadmin_home.dart';
+
+// ─── COLORS ──────────────────────────────────────────────────────────────────
+const _navy = Color(0xFF0C2640);
+const _blue = Color(0xFF185FA5);
+const _slate = Color(0xFF3D5A6E);
+const _muted = Color(0xFF6B7E8F);
+const _iconGray = Color(0xFF8FA8BB);
+const _bg = Color(0xFFF0F4F8);
+const _card = Color(0xFFFFFFFF);
+const _border = Color(0xFFD6E0E8);
+const _rowBg = Color(0xFFEBF3FA);
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,18 +30,15 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   String? _error;
 
-  void _login() async {
+  Future<void> _login() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
       final user = await AuthService.login(_emailCtrl.text, _passCtrl.text);
-
-      setState(() => _loading = false);
       if (!mounted) return;
-
+      setState(() => _loading = false);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -50,288 +57,474 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _fillDemo(String email) {
-    setState(() {
-      _emailCtrl.text = email;
-      _passCtrl.text = 'password123';
-      _error = null;
-    });
-  }
+  void _fillDemo(String email) => setState(() {
+    _emailCtrl.text = email;
+    _passCtrl.text = 'password123';
+    _error = null;
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              children: [
-                Image.asset('assets/gto.png', height: 150),
-                const SizedBox(height: 6),
-                Text(
-                  'WORKFORCE MANAGEMENT',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    letterSpacing: 2.5,
-                    color: kBlueGray,
-                    fontWeight: FontWeight.w500,
-                  ),
+      backgroundColor: _bg,
+      body: Column(
+        children: [
+          // ── Branded header (replaces the ugly white strip) ─────────────────
+          _buildHeader(),
+
+          // ── Scrollable form body ───────────────────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeading(),
+                  const SizedBox(height: 20),
+                  _buildForm(),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    _buildError(),
+                  ],
+                  const SizedBox(height: 20),
+                  _buildSignInButton(),
+                  const SizedBox(height: 24),
+                  _buildDivider(),
+                  const SizedBox(height: 16),
+                  _buildDemoCard(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      color: _navy,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 28,
+        bottom: 28,
+      ),
+      child: Column(
+        children: [
+          // Logo icon box
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                const SizedBox(height: 36),
+              ],
+            ),
+            child: Image.asset('assets/gto.png', width: 80, height: 80),
+          ),
+          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
 
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(26),
-                  decoration: BoxDecoration(
-                    color: kDeepBlue,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Sign in',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Enter your credentials to continue',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          color: kBlueGray,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+  // ── Heading ────────────────────────────────────────────────────────────────
+  Widget _buildHeading() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sign in',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: _navy,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Enter your credentials to continue',
+          style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted),
+        ),
+      ],
+    );
+  }
 
-                      _Label('Email'),
-                      const SizedBox(height: 6),
-                      _Input(
-                        controller: _emailCtrl,
-                        hint: 'you@gto.com',
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 14),
+  // ── Form ───────────────────────────────────────────────────────────────────
+  Widget _buildForm() {
+    return Column(
+      children: [
+        _GTOField(
+          label: 'EMAIL',
+          controller: _emailCtrl,
+          hint: 'you@gto.com',
+          icon: Icons.mail_outline_rounded,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 12),
+        _GTOField(
+          label: 'PASSWORD',
+          controller: _passCtrl,
+          hint: '••••••••',
+          icon: Icons.lock_outline_rounded,
+          obscure: _obscure,
+          suffix: GestureDetector(
+            onTap: () => setState(() => _obscure = !_obscure),
+            child: Icon(
+              _obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 18,
+              color: _iconGray,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            'Forgot password?',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _blue,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-                      _Label('Password'),
-                      const SizedBox(height: 6),
-                      _Input(
-                        controller: _passCtrl,
-                        hint: '••••••••',
-                        obscure: _obscure,
-                        suffix: IconButton(
-                          icon: Icon(
-                            _obscure
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            size: 18,
-                            color: kBlueGray,
-                          ),
-                          onPressed: () => setState(() => _obscure = !_obscure),
-                        ),
-                      ),
+  // ── Error ──────────────────────────────────────────────────────────────────
+  Widget _buildError() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCEBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFF09595)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 14, color: Color(0xFFA32D2D)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              _error!,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: const Color(0xFFA32D2D),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: kDangerBg,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: kDanger.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 14,
-                                color: kDanger,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _error!,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  color: kDanger,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+  // ── Sign in button ─────────────────────────────────────────────────────────
+  Widget _buildSignInButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 46,
+      child: ElevatedButton(
+        onPressed: _loading ? null : _login,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _navy,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: _loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                'Sign In',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+      ),
+    );
+  }
 
-                      const SizedBox(height: 22),
+  // ── Divider ────────────────────────────────────────────────────────────────
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: _border, thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'DEMO ACCOUNTS',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: _iconGray,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ),
+        const Expanded(child: Divider(color: _border, thickness: 1)),
+      ],
+    );
+  }
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: kDeepBlue,
-                            elevation: 2,
-                            shadowColor: Colors.black.withOpacity(0.2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: _loading
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: kDeepBlue,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Signing in...',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Text(
-                                  'Sign In',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                        ),
-                      ),
+  // ── Demo card ──────────────────────────────────────────────────────────────
+  Widget _buildDemoCard() {
+    final demos = [
+      (
+        'B',
+        'Barun Gulati',
+        'barun@gto.com',
+        'Admin',
+        const Color(0xFFD6EAF8),
+        const Color(0xFF0C447C),
+      ),
+      (
+        'S',
+        'Suhani Gulati',
+        'suhanigulati@gto.com',
+        'Finance',
+        const Color(0xFFD1F5EA),
+        const Color(0xFF085041),
+      ),
+      (
+        'P',
+        'Prakhar Mishra',
+        'prakhar@gto.com',
+        'Dev',
+        const Color(0xFFFEF3D6),
+        const Color(0xFF633806),
+      ),
+      (
+        'N',
+        'Nida',
+        'nida@gto.com',
+        'Web Dev',
+        const Color(0xFFD1F5EA),
+        const Color(0xFF085041),
+      ),
+      (
+        'A',
+        'Aditya Sharma',
+        'aditya@gto.com',
+        'Mktg',
+        const Color(0xFFFEF3D6),
+        const Color(0xFF633806),
+      ),
+    ];
 
-                      const SizedBox(height: 20),
-
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: kOffWhite,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'DEMO ACCOUNTS',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: kTealGray,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            _demoTile('barun@gto.com', 'Barun Gulati', 'Admin'),
-                            _demoTile(
-                              'suhanigulati@gto.com',
-                              'Suhani Gulati',
-                              'Finance',
-                            ),
-                            _demoTile(
-                              'prakhar@gto.com',
-                              'Prakhar Mishra',
-                              'Backend Dev',
-                            ),
-                            _demoTile(
-                              'nida@gto.com',
-                              'Chandanmuri Nida',
-                              'Web Dev',
-                            ),
-                            _demoTile(
-                              'aditya@gto.com',
-                              'Aditya Sharma',
-                              'Mktg Mgr',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+    return Container(
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // Header row
+          Container(
+            color: _rowBg,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  'QUICK LOGIN',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: _slate,
+                    letterSpacing: 1.5,
                   ),
                 ),
               ],
             ),
           ),
-        ),
+          ...demos.map(
+            (d) => _DemoRow(
+              initial: d.$1,
+              name: d.$2,
+              email: d.$3,
+              role: d.$4,
+              avatarBg: d.$5,
+              avatarFg: d.$6,
+              onTap: () => _fillDemo(d.$3),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _demoTile(String email, String name, String role) {
-    return GestureDetector(
-      onTap: () => _fillDemo(email),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 6),
+// ─── FIELD WIDGET ─────────────────────────────────────────────────────────────
+class _GTOField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool obscure;
+  final TextInputType? keyboardType;
+  final Widget? suffix;
+
+  const _GTOField({
+    required this.label,
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    this.obscure = false,
+    this.keyboardType,
+    this.suffix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF3D5A6E),
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFD6E0E8), width: 1.5),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 12),
+              Icon(icon, size: 16, color: const Color(0xFF8FA8BB)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  obscureText: obscure,
+                  keyboardType: keyboardType,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    color: const Color(0xFF0C2640),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    hintStyle: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: const Color(0xFFA8BFCC),
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              if (suffix != null) ...[suffix!, const SizedBox(width: 8)],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── DEMO ROW ─────────────────────────────────────────────────────────────────
+class _DemoRow extends StatelessWidget {
+  final String initial, name, email, role;
+  final Color avatarBg, avatarFg;
+  final VoidCallback onTap;
+
+  const _DemoRow({
+    required this.initial,
+    required this.name,
+    required this.email,
+    required this.role,
+    required this.avatarBg,
+    required this.avatarFg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFEEF4F8))),
+        ),
         child: Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
-                color: kInfoBg,
-                borderRadius: BorderRadius.circular(6),
+                color: avatarBg,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
                 child: Text(
-                  name.substring(0, 1),
+                  initial,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: kDeepBlue,
+                    color: avatarFg,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kDeepBlue,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0C2640),
+                    ),
                   ),
-                ),
-                Text(
-                  email,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    color: kTealGray,
+                  Text(
+                    email,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      color: const Color(0xFF8FA8BB),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const Spacer(),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: kInfoBg,
+                color: avatarBg,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -339,7 +532,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 9,
                   fontWeight: FontWeight.w600,
-                  color: kDeepBlue,
+                  color: avatarFg,
                 ),
               ),
             ),
@@ -348,64 +541,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
-
-class _Label extends StatelessWidget {
-  final String text;
-  const _Label(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: GoogleFonts.plusJakartaSans(
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      color: Colors.white70,
-      letterSpacing: 0.4,
-    ),
-  );
-}
-
-class _Input extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final bool obscure;
-  final TextInputType? keyboardType;
-  final Widget? suffix;
-
-  const _Input({
-    required this.controller,
-    required this.hint,
-    this.obscure = false,
-    this.keyboardType,
-    this.suffix,
-  });
-
-  @override
-  Widget build(BuildContext context) => TextField(
-    controller: controller,
-    obscureText: obscure,
-    keyboardType: keyboardType,
-    style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kDeepBlue),
-    decoration: InputDecoration(
-      hintText: hint,
-      hintStyle: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTealGray),
-      suffixIcon: suffix,
-      filled: true,
-      fillColor: kOffWhite,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kDeepBlue, width: 1.6),
-      ),
-    ),
-  );
 }

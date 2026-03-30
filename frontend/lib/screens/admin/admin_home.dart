@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
+import '../../core/responsive.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import '../../services/attendance_service.dart';
@@ -13,6 +14,31 @@ import 'claims_screen.dart';
 import 'salary_screen.dart';
 import 'location_screen.dart';
 
+// ── Nav item definition ───────────────────────────────────────────────────────
+typedef _NavItem = ({IconData icon, IconData activeIcon, String label});
+
+const List<_NavItem> _navItems = [
+  (
+    icon: Icons.dashboard_outlined,
+    activeIcon: Icons.dashboard,
+    label: 'Dashboard',
+  ),
+  (
+    icon: Icons.access_time_outlined,
+    activeIcon: Icons.access_time,
+    label: 'Attendance',
+  ),
+  (
+    icon: Icons.location_on_outlined,
+    activeIcon: Icons.location_on,
+    label: 'Location',
+  ),
+  (icon: Icons.receipt_outlined, activeIcon: Icons.receipt, label: 'Claims'),
+  (icon: Icons.payments_outlined, activeIcon: Icons.payments, label: 'Salary'),
+  (icon: Icons.people_outline, activeIcon: Icons.people, label: 'Team'),
+];
+
+// ── AdminHome ─────────────────────────────────────────────────────────────────
 class AdminHome extends StatefulWidget {
   final UserModel user;
   const AdminHome({super.key, required this.user});
@@ -49,11 +75,14 @@ class _AdminHomeState extends State<AdminHome> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = Responsive.isDesktop(context);
+
     return Scaffold(
       backgroundColor: kOffWhite,
       appBar: AppBar(
         backgroundColor: kDeepBlue,
         elevation: 0,
+        toolbarHeight: 52,
         title: RichText(
           text: TextSpan(
             children: [
@@ -85,6 +114,10 @@ class _AdminHomeState extends State<AdminHome> {
           ),
         ),
         actions: [
+          if (isDesktop) ...[
+            _AppBarAvatar(name: widget.user.name),
+            const SizedBox(width: 8),
+          ],
           TextButton.icon(
             onPressed: _logout,
             icon: const Icon(Icons.logout, size: 16, color: kBlueGray),
@@ -96,60 +129,167 @@ class _AdminHomeState extends State<AdminHome> {
               ),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: kDeepBlue,
-        unselectedItemColor: kBlueGray,
-        selectedLabelStyle: GoogleFonts.plusJakartaSans(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 11),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.access_time_outlined),
-            activeIcon: Icon(Icons.access_time),
-            label: 'Attendance',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on_outlined),
-            activeIcon: Icon(Icons.location_on),
-            label: 'Location',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_outlined),
-            activeIcon: Icon(Icons.receipt),
-            label: 'Claims',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.payments_outlined),
-            activeIcon: Icon(Icons.payments),
-            label: 'Salary',
-          ),
-
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: 'Team',
-          ),
-        ],
-      ),
+      body: isDesktop
+          ? _AdminDesktopLayout(
+              currentIndex: _currentIndex,
+              onNav: (i) => setState(() => _currentIndex = i),
+              child: _screens[_currentIndex],
+            )
+          : _screens[_currentIndex],
+      bottomNavigationBar: isDesktop
+          ? null
+          : BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (i) => setState(() => _currentIndex = i),
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.white,
+              selectedItemColor: kDeepBlue,
+              unselectedItemColor: kBlueGray,
+              selectedLabelStyle: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 11),
+              items: _navItems
+                  .map(
+                    (n) => BottomNavigationBarItem(
+                      icon: Icon(n.icon),
+                      activeIcon: Icon(n.activeIcon),
+                      label: n.label,
+                    ),
+                  )
+                  .toList(),
+            ),
     );
   }
 }
 
-// ── Dashboard Tab ─────────────────────────────────────────
+// ── Desktop sidebar + content ─────────────────────────────────────────────────
+class _AdminDesktopLayout extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onNav;
+  final Widget child;
+
+  const _AdminDesktopLayout({
+    required this.currentIndex,
+    required this.onNav,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // ── Sidebar ──────────────────────────────────────────────────────────
+        Container(
+          width: 210,
+          color: kDeepBlue,
+          child: ListView(
+            padding: const EdgeInsets.only(top: 12),
+            children: List.generate(_navItems.length, (i) {
+              final item = _navItems[i];
+              final active = i == currentIndex;
+              return InkWell(
+                onTap: () => onNav(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.transparent,
+                    border: Border(
+                      left: BorderSide(
+                        color: active ? Colors.blue : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 13,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        active ? item.activeIcon : item.icon,
+                        size: 18,
+                        color: active
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.45),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        item.label,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: active
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.45),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+
+        // ── Content area ─────────────────────────────────────────────────────
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+// ── App bar avatar ────────────────────────────────────────────────────────────
+class _AppBarAvatar extends StatelessWidget {
+  final String name;
+  const _AppBarAvatar({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name
+        .trim()
+        .split(' ')
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: Colors.white.withOpacity(0.15),
+          child: Text(
+            initials,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          name,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Dashboard Tab ─────────────────────────────────────────────────────────────
 class AdminDashboardTab extends StatefulWidget {
   final UserModel user;
   const AdminDashboardTab({super.key, required this.user});
@@ -176,17 +316,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   Future<void> _loadData() async {
     try {
       final now = DateTime.now();
-
-      // All employees
       final employees = await AuthService.getEmployees();
-
-      // Today's attendance
       final attendance = await AttendanceService.getAllToday();
-
-      // Pending claims
       final claims = await ReimbursementService.getAllClaims(status: 'pending');
-
-      // Salary summary
       final summary = await SalaryService.getSummary(now.month, now.year);
 
       setState(() {
@@ -211,217 +343,299 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       return const Center(child: CircularProgressIndicator(color: kDeepBlue));
     }
 
+    final isDesktop = Responsive.isDesktop(context);
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: kDeepBlue,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Good morning,',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: kBlueGray,
-                  ),
+      padding: EdgeInsets.all(isDesktop ? 28 : 16),
+      child: ContentCap(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildGreeting(isDesktop),
+            const SizedBox(height: 20),
+            _SectionLabel('TODAY\'S OVERVIEW'),
+            const SizedBox(height: 10),
+            _buildStatsGrid(isDesktop),
+            const SizedBox(height: 24),
+            if (isDesktop)
+              // Desktop: claims + attendance side by side
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _buildRecentClaimsSection()),
+                    const SizedBox(width: 20),
+                    Expanded(child: _buildAttendanceSection()),
+                  ],
                 ),
-                Text(
-                  widget.user.name,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Admin · GTO Portal',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      color: kBlueGray,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Stats
-          Text(
-            'TODAY\'S OVERVIEW',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: kTealGray,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 10),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.7,
-            children: [
-              _StatCard(
-                label: 'Total Employees',
-                value: '$_totalEmp',
-                icon: Icons.people,
-                color: kDeepBlue,
-                bg: kInfoBg,
-              ),
-              _StatCard(
-                label: 'Present Today',
-                value: '$_presentToday',
-                icon: Icons.check_circle_outline,
-                color: kForest,
-                bg: kSuccessBg,
-              ),
-              _StatCard(
-                label: 'Pending Claims',
-                value: '$_pendingClaims',
-                icon: Icons.receipt_outlined,
-                color: kWarn,
-                bg: kWarnBg,
-              ),
-              _StatCard(
-                label: 'Salary (Mar)',
-                value: _salaryTotal,
-                icon: Icons.payments_outlined,
-                color: kDeepBlue,
-                bg: kInfoBg,
-              ),
+              )
+            else ...[
+              _buildRecentClaimsSection(),
+              const SizedBox(height: 20),
+              _buildAttendanceSection(),
             ],
-          ),
-          const SizedBox(height: 20),
-
-          // Recent claims
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'RECENT CLAIMS',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: kTealGray,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              Text(
-                'See all',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  color: kDeepBlue,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          if (_recentClaims.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'No pending claims',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: kTealGray,
-                  ),
-                ),
-              ),
-            )
-          else
-            ..._recentClaims.map((c) {
-              final submitter = c['submitter'] as Map<String, dynamic>?;
-              final name = submitter?['name'] ?? 'Unknown';
-              final amount = (c['amount'] as num).toDouble();
-              final date = (c['created_at'] as String).substring(0, 10);
-              return _ClaimTile(
-                name: name,
-                category: c['category'] ?? '',
-                amount: '₹${amount.toStringAsFixed(0)}',
-                status: c['status'] ?? '',
-                date: date,
-              );
-            }),
-          const SizedBox(height: 20),
-
-          // Team attendance
-          Text(
-            'TEAM ATTENDANCE TODAY',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: kTealGray,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          if (_todayAttendance.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'No one checked in yet',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: kTealGray,
-                  ),
-                ),
-              ),
-            )
-          else
-            ..._todayAttendance.map((a) {
-              final user = a['users'] as Map<String, dynamic>?;
-              final name = user?['name'] ?? 'Unknown';
-              final role = user?['designation'] ?? '';
-              final loc = user?['location'] ?? '—';
-              String checkIn = '—';
-              if (a['checked_in_at'] != null) {
-                final dt = DateTime.parse(a['checked_in_at']).toLocal();
-                checkIn =
-                    '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-              }
-              return _AttendanceTile(
-                name: name,
-                role: role,
-                location: loc,
-                status: a['status'] ?? 'absent',
-                time: checkIn,
-              );
-            }),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
+    );
+  }
+
+  // ── Greeting ────────────────────────────────────────────────────────────────
+  Widget _buildGreeting(bool isDesktop) {
+    final greetingContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Good morning,',
+          style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kBlueGray),
+        ),
+        Text(
+          widget.user.name,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            'Admin · GTO Portal',
+            style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kBlueGray),
+          ),
+        ),
+      ],
+    );
+
+    // Desktop: show quick summary stats inline on the right
+    final quickStats = isDesktop
+        ? Row(
+            children: [
+              _GreetingStat(label: 'Total Staff', value: '$_totalEmp'),
+              const SizedBox(width: 24),
+              _GreetingStat(label: 'Present', value: '$_presentToday'),
+              const SizedBox(width: 24),
+              _GreetingStat(label: 'Pending Claims', value: '$_pendingClaims'),
+            ],
+          )
+        : null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kDeepBlue,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: isDesktop
+          ? Row(
+              children: [
+                Expanded(child: greetingContent),
+                if (quickStats != null) quickStats,
+              ],
+            )
+          : greetingContent,
+    );
+  }
+
+  // ── Stats grid ───────────────────────────────────────────────────────────────
+  Widget _buildStatsGrid(bool isDesktop) {
+    final cards = [
+      (
+        label: 'Total Employees',
+        value: '$_totalEmp',
+        icon: Icons.people,
+        color: kDeepBlue,
+        bg: kInfoBg,
+      ),
+      (
+        label: 'Present Today',
+        value: '$_presentToday',
+        icon: Icons.check_circle_outline,
+        color: kForest,
+        bg: kSuccessBg,
+      ),
+      (
+        label: 'Pending Claims',
+        value: '$_pendingClaims',
+        icon: Icons.receipt_outlined,
+        color: kWarn,
+        bg: kWarnBg,
+      ),
+      (
+        label: 'Salary (Mar)',
+        value: _salaryTotal,
+        icon: Icons.payments_outlined,
+        color: kDeepBlue,
+        bg: kInfoBg,
+      ),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isDesktop ? 4 : 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: isDesktop ? 1.6 : 1.7,
+      ),
+      itemCount: cards.length,
+      itemBuilder: (_, i) {
+        final c = cards[i];
+        return _StatCard(
+          label: c.label,
+          value: c.value,
+          icon: c.icon,
+          color: c.color,
+          bg: c.bg,
+        );
+      },
+    );
+  }
+
+  // ── Recent claims section ────────────────────────────────────────────────────
+  Widget _buildRecentClaimsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const _SectionLabel('RECENT CLAIMS'),
+            Text(
+              'See all',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: kDeepBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (_recentClaims.isEmpty)
+          _EmptyState('No pending claims')
+        else
+          ..._recentClaims.map((c) {
+            final submitter = c['submitter'] as Map<String, dynamic>?;
+            final name = submitter?['name'] ?? 'Unknown';
+            final amount = (c['amount'] as num).toDouble();
+            final date = (c['created_at'] as String).substring(0, 10);
+            return _ClaimTile(
+              name: name,
+              category: c['category'] ?? '',
+              amount: '₹${amount.toStringAsFixed(0)}',
+              status: c['status'] ?? '',
+              date: date,
+            );
+          }),
+      ],
+    );
+  }
+
+  // ── Team attendance section ──────────────────────────────────────────────────
+  Widget _buildAttendanceSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionLabel('TEAM ATTENDANCE TODAY'),
+        const SizedBox(height: 10),
+        if (_todayAttendance.isEmpty)
+          _EmptyState('No one checked in yet')
+        else
+          ..._todayAttendance.map((a) {
+            final user = a['users'] as Map<String, dynamic>?;
+            final name = user?['name'] ?? 'Unknown';
+            final role = user?['designation'] ?? '';
+            final loc = user?['location'] ?? '—';
+            String checkIn = '—';
+            if (a['checked_in_at'] != null) {
+              final dt = DateTime.parse(a['checked_in_at']).toLocal();
+              checkIn =
+                  '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+            }
+            return _AttendanceTile(
+              name: name,
+              role: role,
+              location: loc,
+              status: a['status'] ?? 'absent',
+              time: checkIn,
+            );
+          }),
+      ],
     );
   }
 }
 
-// ── Stat Card ─────────────────────────────────────────────
+// ── Greeting quick-stat chip (desktop only) ───────────────────────────────────
+class _GreetingStat extends StatelessWidget {
+  final String label, value;
+  const _GreetingStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kBlueGray),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Shared: section label ─────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: GoogleFonts.plusJakartaSans(
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      color: kTealGray,
+      letterSpacing: 1.2,
+    ),
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  final String message;
+  const _EmptyState(this.message);
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Text(
+        message,
+        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
+      ),
+    ),
+  );
+}
+
+// ── Stat Card ─────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final String label, value;
   final IconData icon;
@@ -479,7 +693,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Claim Tile ────────────────────────────────────────────
+// ── Claim Tile ────────────────────────────────────────────────────────────────
 class _ClaimTile extends StatelessWidget {
   final String name, category, amount, status, date;
   const _ClaimTile({
@@ -579,7 +793,7 @@ class _ClaimTile extends StatelessWidget {
   }
 }
 
-// ── Attendance Tile ───────────────────────────────────────
+// ── Attendance Tile ───────────────────────────────────────────────────────────
 class _AttendanceTile extends StatelessWidget {
   final String name, role, location, status, time;
   const _AttendanceTile({
@@ -594,12 +808,12 @@ class _AttendanceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPresent = status == 'present';
     final isLate = status == 'late';
-    Color sc = isPresent
+    final Color sc = isPresent
         ? kForest
         : isLate
         ? kWarn
         : kDanger;
-    Color sb = isPresent
+    final Color sb = isPresent
         ? kSuccessBg
         : isLate
         ? kWarnBg
@@ -685,6 +899,23 @@ class _AttendanceTile extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── ContentCap — caps max width on wide screens ───────────────────────────────
+class ContentCap extends StatelessWidget {
+  final Widget child;
+  final double maxWidth;
+  const ContentCap({super.key, required this.child, this.maxWidth = 1200});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
       ),
     );
   }
