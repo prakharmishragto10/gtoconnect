@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/colors.dart';
@@ -17,19 +18,89 @@ const _card = Color(0xFFFFFFFF);
 const _border = Color(0xFFD6E0E8);
 const _rowBg = Color(0xFFEBF3FA);
 
+// ─── STAR PAINTER ────────────────────────────────────────────────────────────
+class _StarPainter extends CustomPainter {
+  final List<Offset> stars;
+  final List<double> brightness;
+
+  _StarPainter({required this.stars, required this.brightness});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    for (int i = 0; i < stars.length; i++) {
+      final opacity = (brightness[i] * 0.75).clamp(0.0, 1.0);
+      paint.color = Colors.white.withOpacity(opacity);
+      canvas.drawCircle(
+        Offset(stars[i].dx * size.width, stars[i].dy * size.height),
+        brightness[i] * 1.5 + 0.3,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StarPainter old) => true;
+}
+
+// ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _loading = false;
   bool _obscure = true;
   String? _error;
 
+  // ── Star field state ────────────────────────────────────────────────────────
+  final List<Offset> _stars = [];
+  final List<double> _starBrightness = [];
+  final List<double> _starPhase = [];
+  final Random _rng = Random();
+  late AnimationController _starController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Generate 60 random stars
+    for (int i = 0; i < 60; i++) {
+      _stars.add(Offset(_rng.nextDouble(), _rng.nextDouble()));
+      _starBrightness.add(_rng.nextDouble());
+      _starPhase.add(_rng.nextDouble() * pi * 2);
+    }
+
+    // Repeating controller drives the twinkle
+    _starController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    _starController.addListener(() {
+      for (int i = 0; i < _stars.length; i++) {
+        _starPhase[i] += 0.020;
+        _starBrightness[i] = (sin(_starPhase[i]) + 1) / 2;
+      }
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _starController.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
   Future<void> _login() async {
     setState(() {
       _loading = true;
@@ -63,16 +134,14 @@ class _LoginScreenState extends State<LoginScreen> {
     _error = null;
   });
 
+  // ── Build ───────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
       body: Column(
         children: [
-          // ── Branded header (replaces the ugly white strip) ─────────────────
           _buildHeader(),
-
-          // ── Scrollable form body ───────────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
@@ -101,41 +170,43 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Header ─────────────────────────────────────────────────────────────────
+  // ── Header with gradient + stars ────────────────────────────────────────────
   Widget _buildHeader() {
+    final topPad = MediaQuery.of(context).padding.top;
+
     return Container(
       width: double.infinity,
-      color: _navy,
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 28,
-        bottom: 28,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color.fromARGB(255, 8, 27, 66),
+            Color.fromARGB(255, 190, 205, 228),
+            Color.fromARGB(255, 8, 27, 66),
+          ],
+          stops: [0.0, 0.5, 1.0],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
-      child: Column(
+      padding: EdgeInsets.only(top: topPad + 28, bottom: 32),
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          // Logo icon box
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+          // ── Twinkling star layer ─────────────────────────────────────────
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _StarPainter(stars: _stars, brightness: _starBrightness),
             ),
-            child: Image.asset('assets/gto.png', width: 80, height: 80),
           ),
-          const SizedBox(height: 12),
-          const SizedBox(height: 4),
+
+          // ── Logo card ────────────────────────────────────────────────────
+          Image.asset('assets/gto.png', width: 200, height: 200),
         ],
       ),
     );
   }
 
-  // ── Heading ────────────────────────────────────────────────────────────────
+  // ── Heading ─────────────────────────────────────────────────────────────────
   Widget _buildHeading() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Form ───────────────────────────────────────────────────────────────────
+  // ── Form ────────────────────────────────────────────────────────────────────
   Widget _buildForm() {
     return Column(
       children: [
@@ -202,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Error ──────────────────────────────────────────────────────────────────
+  // ── Error banner ─────────────────────────────────────────────────────────────
   Widget _buildError() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -229,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Sign in button ─────────────────────────────────────────────────────────
+  // ── Sign-in button ───────────────────────────────────────────────────────────
   Widget _buildSignInButton() {
     return SizedBox(
       width: double.infinity,
@@ -265,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Divider ────────────────────────────────────────────────────────────────
+  // ── Divider ──────────────────────────────────────────────────────────────────
   Widget _buildDivider() {
     return Row(
       children: [
@@ -287,7 +358,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ── Demo card ──────────────────────────────────────────────────────────────
+  // ── Demo card ────────────────────────────────────────────────────────────────
   Widget _buildDemoCard() {
     final demos = [
       (
@@ -341,7 +412,6 @@ class _LoginScreenState extends State<LoginScreen> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          // Header row
           Container(
             color: _rowBg,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

@@ -19,7 +19,7 @@ class GTOPortalApp extends StatelessWidget {
       title: 'GTO Connect',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: kDeepBlue),
+        colorScheme: ColorScheme.fromSeed(seedColor: kOffWhite),
         textTheme: GoogleFonts.plusJakartaSansTextTheme(),
         useMaterial3: true,
       ),
@@ -388,7 +388,12 @@ class _SplashScreenState extends State<SplashScreen>
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF081A24), Color(0xFF0D2E44), Color(0xFF1D4360)],
+            colors: [
+              Color.fromARGB(255, 8, 27, 66),
+              Color.fromARGB(255, 190, 205, 228),
+              Color.fromARGB(255, 8, 27, 66),
+            ],
+            stops: const [0.0, 0.5, 1.0],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -417,17 +422,8 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset('assets/gto.png', width: 160),
+                      Image.asset('assets/gto.png', width: 400),
                       const SizedBox(height: 16),
-                      Text(
-                        'GTO CONNECT',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white,
-                          fontSize: 20,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
                       const SizedBox(height: 28),
                       const SizedBox(
                         width: 22,
