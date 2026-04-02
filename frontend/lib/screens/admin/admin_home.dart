@@ -319,16 +319,28 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       final employees = await AuthService.getEmployees();
       final attendance = await AttendanceService.getAllToday();
       final claims = await ReimbursementService.getAllClaims(status: 'pending');
-      final summary = await SalaryService.getSummary(now.month, now.year);
+
+      // ── Fix 1: Calculate salary total from employee base_salary ──────────
+      final totalSalary = employees.fold<num>(
+        0,
+        (sum, emp) => sum + ((emp['base_salary'] as num?) ?? 0),
+      );
+
+      // ── Fix 2: Deduplicate attendance by user_id ──────────────────────────
+      final seen = <String>{};
+      final uniqueAttendance = attendance.where((a) {
+        final uid = a['user_id']?.toString() ?? '';
+        return uid.isNotEmpty ? seen.add(uid) : true;
+      }).toList();
 
       setState(() {
         _totalEmp = employees.length;
-        _presentToday = attendance.length;
+        _presentToday = uniqueAttendance.length;
         _pendingClaims = claims.length;
-        _salaryTotal = summary['net'] != null
-            ? '₹${((summary['net'] as num) / 1000).toStringAsFixed(0)}K'
+        _salaryTotal = totalSalary > 0
+            ? '₹${(totalSalary / 1000).toStringAsFixed(0)}K'
             : '—';
-        _todayAttendance = attendance;
+        _todayAttendance = uniqueAttendance;
         _recentClaims = claims.take(3).toList();
         _loading = false;
       });
@@ -469,7 +481,8 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         bg: kWarnBg,
       ),
       (
-        label: 'Salary (Mar)',
+        label:
+            'Salary (${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][DateTime.now().month - 1]})',
         value: _salaryTotal,
         icon: Icons.payments_outlined,
         color: kDeepBlue,

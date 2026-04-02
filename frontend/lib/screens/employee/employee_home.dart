@@ -33,7 +33,6 @@ class _EmployeeHomeState extends State<EmployeeHome> {
     );
   }
 
-  // Screens — built lazily so they don't rebuild on nav switch
   late final _screens = [
     EmpDashboard(user: widget.user),
     EmpAttendance(user: widget.user),
@@ -54,8 +53,6 @@ class _EmployeeHomeState extends State<EmployeeHome> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
-
-      // ── Top app bar ──────────────────────────────────────────────────────
       appBar: AppBar(
         backgroundColor: const Color(0xFF0C2640),
         elevation: 0,
@@ -91,7 +88,6 @@ class _EmployeeHomeState extends State<EmployeeHome> {
           ),
         ),
         actions: [
-          // On desktop: show user name + avatar in appbar
           if (isDesktop) ...[
             _AppBarAvatar(name: widget.user.name),
             const SizedBox(width: 8),
@@ -110,8 +106,6 @@ class _EmployeeHomeState extends State<EmployeeHome> {
           const SizedBox(width: 4),
         ],
       ),
-
-      // ── Body: sidebar on desktop, stack on mobile ────────────────────────
       body: isDesktop
           ? _DesktopLayout(
               currentIndex: _currentIndex,
@@ -119,8 +113,6 @@ class _EmployeeHomeState extends State<EmployeeHome> {
               child: _screens[_currentIndex],
             )
           : _screens[_currentIndex],
-
-      // ── Bottom nav: mobile only ──────────────────────────────────────────
       bottomNavigationBar: isDesktop
           ? null
           : BottomNavigationBar(
@@ -149,7 +141,6 @@ class _EmployeeHomeState extends State<EmployeeHome> {
   }
 }
 
-// ── Desktop: sidebar + content ───────────────────────────────────────────────
 class _DesktopLayout extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onNav;
@@ -172,7 +163,6 @@ class _DesktopLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Sidebar
         Container(
           width: 200,
           color: const Color(0xFF0C2640),
@@ -231,15 +221,12 @@ class _DesktopLayout extends StatelessWidget {
             }),
           ),
         ),
-
-        // Content area — capped width, centered
         Expanded(child: child),
       ],
     );
   }
 }
 
-// ── App bar avatar ────────────────────────────────────────────────────────────
 class _AppBarAvatar extends StatelessWidget {
   final String name;
   const _AppBarAvatar({required this.name});
@@ -280,7 +267,6 @@ class _AppBarAvatar extends StatelessWidget {
   }
 }
 
-// ── Employee Dashboard ────────────────────────────────────────────────────────
 class EmpDashboard extends StatefulWidget {
   final UserModel user;
   const EmpDashboard({super.key, required this.user});
@@ -336,7 +322,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
       setState(() {
         _daysPresent = present;
         _netSalary = salary != null
-            ? '₹${(salary['net_salary'] as num).toStringAsFixed(0)}'
+            ? '₹${(salary['base_salary'] as num).toStringAsFixed(0)}'
             : '—';
         _claimsPending = pending.length;
         _claimsPaid = '₹${paidTotal.toStringAsFixed(0)}';
@@ -387,7 +373,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
     return SingleChildScrollView(
       padding: EdgeInsets.all(isDesktop ? 24 : 16),
       child: ContentCap(
-        // ← caps width on desktop
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -408,7 +393,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
     );
   }
 
-  // ── Greeting ────────────────────────────────────────────────────────────────
   Widget _buildGreeting(bool isDesktop) {
     return Container(
       width: double.infinity,
@@ -418,14 +402,12 @@ class _EmpDashboardState extends State<EmpDashboard> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: isDesktop
-          // Desktop: name left, duty toggle right
           ? Row(
               children: [
                 Expanded(child: _greetingText()),
                 _dutyToggleWidget(),
               ],
             )
-          // Mobile: stacked
           : _greetingText(),
     );
   }
@@ -478,7 +460,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
     ],
   );
 
-  // ── Toggles card ────────────────────────────────────────────────────────────
   Widget _buildToggles() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -540,7 +521,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
     );
   }
 
-  // ── Stats grid — 2 cols on mobile, 4 cols on desktop ────────────────────────
   Widget _buildStatsGrid(bool isDesktop) {
     final cards = [
       _StatData(
@@ -577,7 +557,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isDesktop ? 4 : 2, // ← key fix
+        crossAxisCount: isDesktop ? 4 : 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
         childAspectRatio: isDesktop ? 1.5 : 1.7,
@@ -587,7 +567,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
     );
   }
 
-  // ── Recent claims ────────────────────────────────────────────────────────────
   Widget _buildRecentClaims() {
     if (_recentClaims.isEmpty) {
       return Center(
@@ -616,7 +595,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
   }
 }
 
-// ── Small shared widgets ──────────────────────────────────────────────────────
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);

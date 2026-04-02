@@ -189,7 +189,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                   ),
                 ),
                 Text(
-                  '₹${net.toStringAsFixed(0)}',
+                  '₹${base.toStringAsFixed(0)}',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
@@ -249,7 +249,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                       ),
                     ),
                     Text(
-                      '₹${net.toStringAsFixed(0)}',
+                      '₹${base.toStringAsFixed(0)}',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -332,7 +332,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${netS.toStringAsFixed(0)}',
+                        '₹${base.toStringAsFixed(0)}',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
