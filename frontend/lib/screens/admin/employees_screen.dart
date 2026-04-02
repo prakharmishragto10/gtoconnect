@@ -117,7 +117,6 @@ class _EmployeeCard extends StatelessWidget {
     final name = emp['name'] ?? '—';
     final role = emp['designation'] ?? '—';
     final loc = emp['location'] ?? '—';
-    final upi = emp['upi_id'] ?? '—';
     final salary = emp['base_salary'];
 
     return Container(
@@ -200,14 +199,6 @@ class _EmployeeCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  upi,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    color: kTealGray,
-                  ),
                 ),
               ],
             ),

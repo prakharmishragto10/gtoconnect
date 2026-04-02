@@ -71,3 +71,16 @@ export const getAllUsers = async () => {
   if (error) throw new Error(error.message);
   return data;
 };
+
+export const updatePassword = async (userId, newPassword) => {
+  const hashed = await bcrypt.hash(newPassword, 10);
+
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash: hashed })
+    .eq("id", userId);
+
+  if (error) throw new Error(error.message);
+
+  return { message: "Password updated successfully" };
+};

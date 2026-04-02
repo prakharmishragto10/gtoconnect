@@ -1,4 +1,9 @@
-import { loginUser, getMe, getAllUsers } from "../services/auth.service.js";
+import {
+  loginUser,
+  getMe,
+  getAllUsers,
+  updatePassword,
+} from "../services/auth.service.js";
 
 export const login = async (req, res) => {
   try {
@@ -30,5 +35,21 @@ export const employees = async (req, res) => {
     res.json({ users });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+export const updatePass = async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: "Password required" });
+    }
+
+    const result = await updatePassword(req.user.id, password);
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };

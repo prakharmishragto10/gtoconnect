@@ -2,23 +2,22 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/colors.dart';
+import '../core/responsive.dart';
 import '../services/auth_service.dart';
 import 'admin/admin_home.dart';
 import 'employee/employee_home.dart';
 import 'subadmin/subadmin_home.dart';
 
-// ─── COLORS ──────────────────────────────────────────────────────────────────
+// ─── COLORS ───────────────────────────────────────────────────────────────────
 const _navy = Color(0xFF0C2640);
 const _blue = Color(0xFF185FA5);
-const _slate = Color(0xFF3D5A6E);
 const _muted = Color(0xFF6B7E8F);
 const _iconGray = Color(0xFF8FA8BB);
 const _bg = Color(0xFFF0F4F8);
 const _card = Color(0xFFFFFFFF);
 const _border = Color(0xFFD6E0E8);
-const _rowBg = Color(0xFFEBF3FA);
 
-// ─── STAR PAINTER ────────────────────────────────────────────────────────────
+// ─── STAR PAINTER ─────────────────────────────────────────────────────────────
 class _StarPainter extends CustomPainter {
   final List<Offset> stars;
   final List<double> brightness;
@@ -59,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscure = true;
   String? _error;
 
-  // ── Star field state ────────────────────────────────────────────────────────
+  // ── Star field state ──────────────────────────────────────────────────────
   final List<Offset> _stars = [];
   final List<double> _starBrightness = [];
   final List<double> _starPhase = [];
@@ -70,14 +69,12 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
 
-    // Generate 60 random stars
     for (int i = 0; i < 60; i++) {
       _stars.add(Offset(_rng.nextDouble(), _rng.nextDouble()));
       _starBrightness.add(_rng.nextDouble());
       _starPhase.add(_rng.nextDouble() * pi * 2);
     }
 
-    // Repeating controller drives the twinkle
     _starController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
@@ -100,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
+  // ── Auth ──────────────────────────────────────────────────────────────────
   Future<void> _login() async {
     setState(() {
       _loading = true;
@@ -128,49 +125,107 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _fillDemo(String email) => setState(() {
-    _emailCtrl.text = email;
-    _passCtrl.text = 'password123';
-    _error = null;
-  });
-
-  // ── Build ───────────────────────────────────────────────────────────────────
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final isDesktop = Responsive.isDesktop(context);
+
     return Scaffold(
       backgroundColor: _bg,
-      body: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
+      body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+    );
+  }
+
+  // ── Mobile layout ─────────────────────────────────────────────────────────
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+            child: ContentCap(maxWidth: 480, child: _buildFormContent()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Desktop layout (centered card) ────────────────────────────────────────
+  Widget _buildDesktopLayout() {
+    final topPad = MediaQuery.of(context).padding.top;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color.fromARGB(255, 8, 27, 66),
+                  Color.fromARGB(255, 190, 205, 228),
+                  Color.fromARGB(255, 8, 27, 66),
+                ],
+                stops: [0.0, 0.5, 1.0],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: CustomPaint(
+              painter: _StarPainter(stars: _stars, brightness: _starBrightness),
+            ),
+          ),
+        ),
+        Center(
+          child: ContentCap(
+            maxWidth: 480,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+              padding: EdgeInsets.fromLTRB(0, topPad + 32, 0, 32),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeading(),
-                  const SizedBox(height: 20),
-                  _buildForm(),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    _buildError(),
-                  ],
-                  const SizedBox(height: 20),
-                  _buildSignInButton(),
+                  Image.asset('assets/gto.png', width: 120, height: 120),
                   const SizedBox(height: 24),
-                  _buildDivider(),
-                  const SizedBox(height: 16),
-                  _buildDemoCard(),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(32),
+                    child: _buildFormContent(),
+                  ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  // ── Header with gradient + stars ────────────────────────────────────────────
+  // ── Shared form content ───────────────────────────────────────────────────
+  Widget _buildFormContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeading(),
+        const SizedBox(height: 20),
+        _buildForm(),
+        if (_error != null) ...[const SizedBox(height: 12), _buildError()],
+        const SizedBox(height: 20),
+        _buildSignInButton(),
+      ],
+    );
+  }
+
+  // ── Header (mobile only) ──────────────────────────────────────────────────
   Widget _buildHeader() {
     final topPad = MediaQuery.of(context).padding.top;
 
@@ -192,21 +247,18 @@ class _LoginScreenState extends State<LoginScreen>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // ── Twinkling star layer ─────────────────────────────────────────
           Positioned.fill(
             child: CustomPaint(
               painter: _StarPainter(stars: _stars, brightness: _starBrightness),
             ),
           ),
-
-          // ── Logo card ────────────────────────────────────────────────────
           Image.asset('assets/gto.png', width: 200, height: 200),
         ],
       ),
     );
   }
 
-  // ── Heading ─────────────────────────────────────────────────────────────────
+  // ── Heading ───────────────────────────────────────────────────────────────
   Widget _buildHeading() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +280,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Form ────────────────────────────────────────────────────────────────────
+  // ── Form ──────────────────────────────────────────────────────────────────
   Widget _buildForm() {
     return Column(
       children: [
@@ -273,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Error banner ─────────────────────────────────────────────────────────────
+  // ── Error banner ──────────────────────────────────────────────────────────
   Widget _buildError() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -300,7 +352,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Sign-in button ───────────────────────────────────────────────────────────
+  // ── Sign-in button ────────────────────────────────────────────────────────
   Widget _buildSignInButton() {
     return SizedBox(
       width: double.infinity,
@@ -332,115 +384,6 @@ class _LoginScreenState extends State<LoginScreen>
                   letterSpacing: 0.3,
                 ),
               ),
-      ),
-    );
-  }
-
-  // ── Divider ──────────────────────────────────────────────────────────────────
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        const Expanded(child: Divider(color: _border, thickness: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'DEMO ACCOUNTS',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: _iconGray,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: _border, thickness: 1)),
-      ],
-    );
-  }
-
-  // ── Demo card ────────────────────────────────────────────────────────────────
-  Widget _buildDemoCard() {
-    final demos = [
-      (
-        'B',
-        'Barun Gulati',
-        'barun@gto.com',
-        'Admin',
-        const Color(0xFFD6EAF8),
-        const Color(0xFF0C447C),
-      ),
-      (
-        'S',
-        'Suhani Gulati',
-        'suhanigulati@gto.com',
-        'Finance',
-        const Color(0xFFD1F5EA),
-        const Color(0xFF085041),
-      ),
-      (
-        'P',
-        'Prakhar Mishra',
-        'prakhar@gto.com',
-        'Dev',
-        const Color(0xFFFEF3D6),
-        const Color(0xFF633806),
-      ),
-      (
-        'N',
-        'Nida',
-        'nida@gto.com',
-        'Web Dev',
-        const Color(0xFFD1F5EA),
-        const Color(0xFF085041),
-      ),
-      (
-        'A',
-        'Aditya Sharma',
-        'aditya@gto.com',
-        'Mktg',
-        const Color(0xFFFEF3D6),
-        const Color(0xFF633806),
-      ),
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Container(
-            color: _rowBg,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Row(
-              children: [
-                Text(
-                  'QUICK LOGIN',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: _slate,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ...demos.map(
-            (d) => _DemoRow(
-              initial: d.$1,
-              name: d.$2,
-              email: d.$3,
-              role: d.$4,
-              avatarBg: d.$5,
-              avatarFg: d.$6,
-              onTap: () => _fillDemo(d.$3),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -519,96 +462,6 @@ class _GTOField extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─── DEMO ROW ─────────────────────────────────────────────────────────────────
-class _DemoRow extends StatelessWidget {
-  final String initial, name, email, role;
-  final Color avatarBg, avatarFg;
-  final VoidCallback onTap;
-
-  const _DemoRow({
-    required this.initial,
-    required this.name,
-    required this.email,
-    required this.role,
-    required this.avatarBg,
-    required this.avatarFg,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFEEF4F8))),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: avatarBg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  initial,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: avatarFg,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF0C2640),
-                    ),
-                  ),
-                  Text(
-                    email,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      color: const Color(0xFF8FA8BB),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: avatarBg,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                role,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: avatarFg,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

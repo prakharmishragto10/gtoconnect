@@ -73,8 +73,6 @@ class _EmpSalaryState extends State<EmpSalary> {
     final isPaid = selected['status'] == 'paid';
     final base = (selected['base_salary'] as num).toDouble();
     final reimb = (selected['reimbursements'] as num).toDouble();
-    final tds = (selected['tds'] as num).toDouble();
-    final pf = (selected['pf'] as num).toDouble();
     final net = (selected['net_salary'] as num).toDouble();
     final month = _monthName(selected['month'] as int);
     final year = selected['year'].toString();
@@ -199,69 +197,6 @@ class _EmpSalaryState extends State<EmpSalary> {
                     letterSpacing: -1,
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // UPI info
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        size: 16,
-                        color: kBlueGray,
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'UPI ID on file',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10,
-                              color: kBlueGray,
-                            ),
-                          ),
-                          Text(
-                            widget.user.upiId ?? '—',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (isPaid && selected['paid_at'] != null) ...[
-                        const Spacer(),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              'Paid on',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10,
-                                color: kBlueGray,
-                              ),
-                            ),
-                            Text(
-                              (selected['paid_at'] as String).substring(0, 10),
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -300,20 +235,6 @@ class _EmpSalaryState extends State<EmpSalary> {
                   value: '+ ₹${reimb.toStringAsFixed(0)}',
                   valueColor: kForest,
                   icon: Icons.receipt_outlined,
-                ),
-                const SizedBox(height: 10),
-                _BreakdownRow(
-                  label: 'TDS (10%)',
-                  value: '- ₹${tds.toStringAsFixed(0)}',
-                  valueColor: kDanger,
-                  icon: Icons.remove_circle_outline,
-                ),
-                const SizedBox(height: 10),
-                _BreakdownRow(
-                  label: 'PF (12%)',
-                  value: '- ₹${pf.toStringAsFixed(0)}',
-                  valueColor: kDanger,
-                  icon: Icons.remove_circle_outline,
                 ),
                 const Divider(height: 20, color: kBorder),
                 Row(

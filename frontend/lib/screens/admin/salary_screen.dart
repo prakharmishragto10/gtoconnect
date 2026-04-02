@@ -15,12 +15,31 @@ class _SalaryScreenState extends State<SalaryScreen> {
   List<dynamic> _salaries = [];
   Map<String, dynamic> _summary = {};
 
-  final int _month = 3;
-  final int _year = 2026;
+  late int _month;
+  late int _year;
+
+  static const _monthNames = [
+    '',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _month = now.month;
+    _year = now.year;
     _loadData();
   }
 
@@ -89,10 +108,9 @@ class _SalaryScreenState extends State<SalaryScreen> {
       return const Center(child: CircularProgressIndicator(color: kDeepBlue));
     }
 
+    final monthLabel = '${_monthNames[_month]} $_year';
     final gross = (_summary['gross'] as num?)?.toDouble() ?? 0;
     final reimb = (_summary['reimbursements'] as num?)?.toDouble() ?? 0;
-    final tds = (_summary['tds'] as num?)?.toDouble() ?? 0;
-    final pf = (_summary['pf'] as num?)?.toDouble() ?? 0;
     final net = (_summary['net'] as num?)?.toDouble() ?? 0;
     final paid = (_summary['paid'] as num?)?.toInt() ?? 0;
     final pend = (_summary['pending'] as num?)?.toInt() ?? 0;
@@ -117,7 +135,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                     ),
                   ),
                   Text(
-                    'March 2026 · Base ₹15,000',
+                    monthLabel,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       color: kTealGray,
@@ -164,7 +182,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'No salary records for March 2026',
+                      'No salary records for $monthLabel',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         color: kTealGray,
@@ -204,22 +222,10 @@ class _SalaryScreenState extends State<SalaryScreen> {
                     const Color(0xFF9FE1CB),
                     false,
                   ),
-                  _PayrollRow(
-                    'TDS (10%)',
-                    '- ₹${tds.toStringAsFixed(0)}',
-                    const Color(0xFFF09595),
-                    false,
-                  ),
-                  _PayrollRow(
-                    'PF (12%)',
-                    '- ₹${pf.toStringAsFixed(0)}',
-                    const Color(0xFFF09595),
-                    false,
-                  ),
                   const Divider(color: Colors.white24, height: 20),
                   _PayrollRow(
                     'Net Payable',
-                    '₹${net.toStringAsFixed(0)}',
+                    '₹${gross.toStringAsFixed(0)}',
                     Colors.white,
                     true,
                   ),
@@ -252,13 +258,10 @@ class _SalaryScreenState extends State<SalaryScreen> {
               final s = e.value;
               final user = s['users'] as Map<String, dynamic>?;
               final name = user?['name'] ?? 'Unknown';
-              final upi = user?['upi_id'] ?? '—';
               final isPaid = s['status'] == 'paid';
               final sNet = (s['net_salary'] as num).toDouble();
               final sBase = (s['base_salary'] as num).toDouble();
               final sReimb = (s['reimbursements'] as num).toDouble();
-              final sTds = (s['tds'] as num).toDouble();
-              final sPf = (s['pf'] as num).toDouble();
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -292,32 +295,20 @@ class _SalaryScreenState extends State<SalaryScreen> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: kDeepBlue,
-                                ),
-                              ),
-                              Text(
-                                upi,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 10,
-                                  color: kTealGray,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            name,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: kDeepBlue,
+                            ),
                           ),
                         ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '₹${sNet.toStringAsFixed(0)}',
+                              '₹${sBase.toStringAsFixed(0)}',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -367,18 +358,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
                             kForest,
                           ),
                           _BreakdownItem(
-                            'TDS',
-                            '₹${sTds.toStringAsFixed(0)}',
-                            kDanger,
-                          ),
-                          _BreakdownItem(
-                            'PF',
-                            '₹${sPf.toStringAsFixed(0)}',
-                            kDanger,
-                          ),
-                          _BreakdownItem(
                             'Net',
-                            '₹${sNet.toStringAsFixed(0)}',
+                            '₹${sBase.toStringAsFixed(0)}',
                             kDeepBlue,
                           ),
                         ],
