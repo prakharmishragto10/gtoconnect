@@ -72,15 +72,73 @@ export const getAllUsers = async () => {
   return data;
 };
 
-export const updatePassword = async (userId, newPassword) => {
-  const hashed = await bcrypt.hash(newPassword, 10);
-
-  const { error } = await supabase
+export const updatePassword = async (email, password) => {
+  // 1. Find user
+  const { data: user, error } = await supabase
     .from("users")
-    .update({ password_hash: hashed })
-    .eq("id", userId);
+    .select("*")
+    .eq("email", email.toLowerCase().trim())
+    .single();
+  // ADD THIS 👇
+  console.log("Looking for email:", email.toLowerCase().trim());
+  console.log("Supabase result - user:", user);
+  console.log("Supabase result - error:", JSON.stringify(error));
+
+  if (error || !user) throw new Error("User not found");
+
+  // 2. Hash password using bcrypt
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // 3. Update password
+  const { error: updateError } = await supabase
+    .from("users")
+    .update({
+      password_hash: hashedPassword,
+    })
+    .eq("id", user.id);
+
+  if (updateError) throw new Error(updateError.message);
+
+  return { message: "Password updated successfully" };
+};
+export const createEmployee = async ({
+  name,
+  email,
+  password,
+  designation,
+  location,
+  upi_id,
+  base_salary,
+}) => {
+  // 1. Check if email already exists
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", email.toLowerCase().trim())
+    .single();
+
+  if (existing) throw new Error("Email already registered");
+
+  // 2. Hash password
+  const password_hash = await bcrypt.hash(password, 10);
+
+  // 3. Insert new employee
+  const { data: user, error } = await supabase
+    .from("users")
+    .insert({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password_hash,
+      role: "employee",
+      designation: designation?.trim() || null,
+      location: location?.trim() || null,
+      upi_id: upi_id?.trim() || null,
+      base_salary: base_salary || null,
+    })
+    .select("id, name, email, role, designation, location, upi_id, base_salary")
+    .single();
 
   if (error) throw new Error(error.message);
 
-  return { message: "Password updated successfully" };
+  return { message: "Employee created successfully", user };
 };

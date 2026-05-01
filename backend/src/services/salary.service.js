@@ -1,17 +1,11 @@
 import supabase from "../config/supabase.js";
 
-const TDS_RATE = 0.1;
-const PF_RATE = 0.12;
-
 export const calculateSalary = (baseSalary, reimbursements = 0) => {
-  const tds = baseSalary * TDS_RATE;
-  const pf = baseSalary * PF_RATE;
-  const net = baseSalary + reimbursements - tds - pf;
-  return { tds, pf, net };
+  const net = baseSalary + reimbursements;
+  return { net };
 };
 
 export const generateMonthlySalary = async (month, year) => {
-  // Get all employees
   const { data: employees, error: empError } = await supabase
     .from("users")
     .select("id, name, base_salary")
@@ -22,7 +16,6 @@ export const generateMonthlySalary = async (month, year) => {
   const results = [];
 
   for (const emp of employees) {
-    // Get approved reimbursements for this month
     const from = `${year}-${String(month).padStart(2, "0")}-01`;
     const to = `${year}-${String(month).padStart(2, "0")}-31`;
 
@@ -40,9 +33,8 @@ export const generateMonthlySalary = async (month, year) => {
     );
 
     const base = Number(emp.base_salary) || 15000;
-    const { tds, pf, net } = calculateSalary(base, reimbursements);
+    const { net } = calculateSalary(base, reimbursements);
 
-    // Upsert salary record
     const { data, error } = await supabase
       .from("salary_records")
       .upsert(
@@ -52,12 +44,10 @@ export const generateMonthlySalary = async (month, year) => {
           year,
           base_salary: base,
           reimbursements,
-          tds,
-          pf,
           net_salary: net,
           status: "pending",
         },
-        { onConflict: "user_id, month, year" },
+        { onConflict: "user_id,month,year" },
       )
       .select()
       .single();
@@ -124,7 +114,7 @@ export const markSalaryPaid = async (salaryId) => {
 export const getPayrollSummary = async (month, year) => {
   const { data, error } = await supabase
     .from("salary_records")
-    .select("base_salary, reimbursements, tds, pf, net_salary, status")
+    .select("base_salary, reimbursements, net_salary, status")
     .eq("month", month)
     .eq("year", year);
 
@@ -134,13 +124,11 @@ export const getPayrollSummary = async (month, year) => {
     (acc, s) => ({
       gross: acc.gross + Number(s.base_salary),
       reimbursements: acc.reimbursements + Number(s.reimbursements),
-      tds: acc.tds + Number(s.tds),
-      pf: acc.pf + Number(s.pf),
       net: acc.net + Number(s.net_salary),
       paid: acc.paid + (s.status === "paid" ? 1 : 0),
       pending: acc.pending + (s.status === "pending" ? 1 : 0),
     }),
-    { gross: 0, reimbursements: 0, tds: 0, pf: 0, net: 0, paid: 0, pending: 0 },
+    { gross: 0, reimbursements: 0, net: 0, paid: 0, pending: 0 },
   );
 
   return summary;
