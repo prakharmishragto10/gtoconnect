@@ -13,6 +13,8 @@ const router = express.Router();
 router.post("/login", login);
 router.get("/me", auth, me);
 router.get("/employees", auth, adminOnly, employees);
+
 router.patch("/updatepass", updatePass);
 router.post("/signup", signupEmployee);
+
 export default router;
