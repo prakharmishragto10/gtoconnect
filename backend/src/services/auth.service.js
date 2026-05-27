@@ -29,7 +29,7 @@ export const loginUser = async (email, password) => {
       upi_id: user.upi_id,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" },
+    { expiresIn: "360d" },
   );
 
   return {
