@@ -277,6 +277,7 @@ class EmpDashboard extends StatefulWidget {
 
 class _EmpDashboardState extends State<EmpDashboard> {
   bool _isOnDuty = false;
+  bool _dutyToggling = false;
   bool _locationSharing = false;
   bool _loading = true;
   String _checkInTime = '--:--';
@@ -290,6 +291,13 @@ class _EmpDashboardState extends State<EmpDashboard> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
   }
 
   Future<void> _loadData() async {
@@ -335,6 +343,8 @@ class _EmpDashboardState extends State<EmpDashboard> {
   }
 
   Future<void> _toggleDuty() async {
+    if (_dutyToggling) return;
+    setState(() => _dutyToggling = true);
     try {
       if (_isOnDuty) {
         await AttendanceService.checkOut();
@@ -360,6 +370,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
         ),
       );
     }
+    if (mounted) setState(() => _dutyToggling = false);
   }
 
   @override
@@ -416,7 +427,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        'Good morning,',
+        _greeting(), // ← was 'Good morning,'
         style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kBlueGray),
       ),
       Text(
@@ -437,7 +448,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
       ),
     ],
   );
-
   Widget _dutyToggleWidget() => Row(
     children: [
       Container(
@@ -456,10 +466,24 @@ class _EmpDashboardState extends State<EmpDashboard> {
         ),
       ),
       const SizedBox(width: 10),
-      _Toggle(value: _isOnDuty, onTap: _toggleDuty),
+      _dutyToggling
+          ? const SizedBox(
+              width: 46,
+              height: 26,
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: kBlueGray,
+                  ),
+                ),
+              ),
+            )
+          : _Toggle(value: _isOnDuty, onTap: _toggleDuty),
     ],
   );
-
   Widget _buildToggles() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -529,13 +553,6 @@ class _EmpDashboardState extends State<EmpDashboard> {
         Icons.check_circle_outline,
         kForest,
         kSuccessBg,
-      ),
-      _StatData(
-        'Net Salary',
-        _netSalary,
-        Icons.payments_outlined,
-        kDeepBlue,
-        kInfoBg,
       ),
       _StatData(
         'Claims Pending',

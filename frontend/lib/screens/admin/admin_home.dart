@@ -313,6 +313,13 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
     _loadData();
   }
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
   Future<void> _loadData() async {
     try {
       final now = DateTime.now();
@@ -399,7 +406,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Good morning,',
+          _greeting(),
           style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kBlueGray),
         ),
         Text(

@@ -293,6 +293,29 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
   String _netPayable = '—';
   List<dynamic> _recentClaims = [];
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  String _monthYear(DateTime dt) => '${_months[dt.month - 1]} ${dt.year}';
+
   @override
   void initState() {
     super.initState();
@@ -363,7 +386,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Good morning,',
+          _greeting(),
           style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kBlueGray),
         ),
         Text(
@@ -441,7 +464,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
       (
         label: 'Net Payable',
         value: _netPayable,
-        sub: 'March 2026',
+        sub: _monthYear(DateTime.now()),
         icon: Icons.payments_outlined,
         color: kDeepBlue,
         bg: kInfoBg,

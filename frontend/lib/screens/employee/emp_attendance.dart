@@ -22,6 +22,24 @@ class _EmpAttendanceState extends State<EmpAttendance> {
   String _checkInTime = '--:--';
   String _checkOutTime = '--:--';
   List<dynamic> _history = [];
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  String _formatMonthYear(DateTime dt) => '${_months[dt.month - 1]} ${dt.year}';
+
+  String _formatFullDate(DateTime dt) =>
+      '${dt.day} ${_months[dt.month - 1]} ${dt.year}';
 
   @override
   void initState() {
@@ -111,6 +129,7 @@ class _EmpAttendanceState extends State<EmpAttendance> {
       }
     }
   }
+
   void _showSnack(String msg, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -161,7 +180,7 @@ class _EmpAttendanceState extends State<EmpAttendance> {
             ),
           ),
           Text(
-            'March 2026',
+            _formatMonthYear(DateTime.now()),
             style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
           ),
           const SizedBox(height: 16),
@@ -189,7 +208,7 @@ class _EmpAttendanceState extends State<EmpAttendance> {
                           ),
                         ),
                         Text(
-                          '${DateTime.now().day} Mar ${DateTime.now().year}',
+                          _formatFullDate(DateTime.now()),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
