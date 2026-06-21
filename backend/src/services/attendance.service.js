@@ -96,8 +96,13 @@ export const getAllTodayAttendance = async () => {
 };
 
 export const getMonthlyReport = async (month, year) => {
-  const from = `${year}-${String(month).padStart(2, "0")}-01`;
-  const to = `${year}-${String(month).padStart(2, "0")}-31`;
+  const from = new Date(year, month - 1, 1)
+    .toISOString()
+    .split("T")[0];
+
+  const to = new Date(year, month, 0)
+    .toISOString()
+    .split("T")[0];
 
   const { data, error } = await supabase
     .from("attendance")
@@ -107,5 +112,6 @@ export const getMonthlyReport = async (month, year) => {
     .order("date", { ascending: false });
 
   if (error) throw new Error(error.message);
+
   return data;
 };
