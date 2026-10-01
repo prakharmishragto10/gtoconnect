@@ -71,25 +71,51 @@ export const getTodayStatus = async (userId) => {
   return data || null;
 };
 
-export const getMyAttendance = async (userId) => {
-  const { data, error } = await supabase
+export const getMyAttendance = async (userId, filters = {}) => {
+  let query = supabase
     .from("attendance")
     .select("*")
-    .eq("user_id", userId)
-    .order("date", { ascending: false });
+    .eq("user_id", userId);
+
+  if (filters.date) {
+    query = query.eq("date", filters.date);
+  } else if (filters.month && filters.year) {
+    const from = new Date(filters.year, filters.month - 1, 1).toISOString().split("T")[0];
+    const to = new Date(filters.year, filters.month, 0).toISOString().split("T")[0];
+    query = query.gte("date", from).lte("date", to);
+  } else if (filters.year) {
+    const from = `${filters.year}-01-01`;
+    const to = `${filters.year}-12-31`;
+    query = query.gte("date", from).lte("date", to);
+  }
+
+  const { data, error } = await query.order("date", { ascending: false });
 
   if (error) throw new Error(error.message);
   return data;
 };
 
-export const getAllTodayAttendance = async () => {
-  const today = new Date().toISOString().split("T")[0];
-
-  const { data, error } = await supabase
+export const getAllTodayAttendance = async (filters = {}) => {
+  let query = supabase
     .from("attendance")
-    .select(`*, users (id, name, email, designation, location)`)
-    .eq("date", today)
-    .order("checked_in_at", { ascending: true });
+    .select(`*, users (id, name, email, designation, location)`);
+
+  if (filters.date) {
+    query = query.eq("date", filters.date);
+  } else if (filters.month && filters.year) {
+    const from = new Date(filters.year, filters.month - 1, 1).toISOString().split("T")[0];
+    const to = new Date(filters.year, filters.month, 0).toISOString().split("T")[0];
+    query = query.gte("date", from).lte("date", to);
+  } else if (filters.year) {
+    const from = `${filters.year}-01-01`;
+    const to = `${filters.year}-12-31`;
+    query = query.gte("date", from).lte("date", to);
+  } else {
+    const today = new Date().toISOString().split("T")[0];
+    query = query.eq("date", today);
+  }
+
+  const { data, error } = await query.order("checked_in_at", { ascending: true });
 
   if (error) throw new Error(error.message);
   return data;
@@ -113,5 +139,16 @@ export const getMonthlyReport = async (month, year) => {
 
   if (error) throw new Error(error.message);
 
+  return data;
+};
+
+export const getAllAttendance = async () => {
+  const { data, error } = await supabase
+    .from("attendance")
+    .select(`*, users (id, name, email, designation, location)`)
+    .order("date", { ascending: false })
+    .order("checked_in_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
   return data;
 };

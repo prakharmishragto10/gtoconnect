@@ -1,6 +1,6 @@
 class Env {
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'https://gtoconnect.vercel.app',
+    defaultValue: 'http://localhost:3000',
   );
 }

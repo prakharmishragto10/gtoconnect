@@ -279,7 +279,9 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     // Bezier position for particle emission
-    final size = context.size ?? const Size(400, 800);
+    final ro = context.findRenderObject();
+    if (ro == null || ro is! RenderBox || !ro.hasSize) return;
+    final size = ro.size;
     final eT = _eased.value;
 
     final p0 = Offset(-0.05 * size.width, 0.88 * size.height);

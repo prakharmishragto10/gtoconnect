@@ -63,6 +63,14 @@ class Api {
     return _handle(res);
   }
 
+  static Future<Map<String, dynamic>> delete(String endpoint) async {
+    final res = await http.delete(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: await _headers(),
+    );
+    return _handle(res);
+  }
+
   static Map<String, dynamic> _handle(http.Response res) {
     final data = jsonDecode(res.body);
     if (res.statusCode >= 200 && res.statusCode < 300) {

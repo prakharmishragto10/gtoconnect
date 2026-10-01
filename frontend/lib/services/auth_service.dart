@@ -40,8 +40,45 @@ class AuthService {
     await Api.clearToken();
   }
 
+  static Future<Map<String, dynamic>> createEmployee({
+    required String name,
+    required String email,
+    required String password,
+    String? designation,
+    String? location,
+    String? upiId,
+    num? baseSalary,
+  }) async {
+    final data = await Api.post(
+      '/api/auth/signup',
+      body: {
+        'name': name,
+        'email': email,
+        'password': password,
+        if (designation != null && designation.isNotEmpty)
+          'designation': designation,
+        if (location != null && location.isNotEmpty) 'location': location,
+        if (upiId != null && upiId.isNotEmpty) 'upi_id': upiId,
+        if (baseSalary != null) 'base_salary': baseSalary,
+      },
+    );
+    return data;
+  }
+
   static Future<List<dynamic>> getEmployees() async {
     final data = await Api.get('/api/auth/employees');
     return data['users'] ?? [];
+  }
+
+  static Future<void> deleteEmployee(String userId) async {
+    await Api.delete('/api/auth/employees/$userId');
+  }
+
+  static Future<Map<String, dynamic>> updateEmployee(
+    String userId,
+    Map<String, dynamic> fields,
+  ) async {
+    final data = await Api.patch('/api/auth/employees/$userId', body: fields);
+    return data;
   }
 }

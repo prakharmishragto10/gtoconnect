@@ -5,6 +5,7 @@ import {
   getMyAttendance,
   getAllTodayAttendance,
   getMonthlyReport,
+  getAllAttendance,
 } from "../services/attendance.service.js";
 
 export const checkin = async (req, res) => {
@@ -36,7 +37,8 @@ export const today = async (req, res) => {
 
 export const myHistory = async (req, res) => {
   try {
-    const data = await getMyAttendance(req.user.id);
+    const { date, month, year } = req.query;
+    const data = await getMyAttendance(req.user.id, { date, month, year });
     res.json({ attendance: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -45,7 +47,8 @@ export const myHistory = async (req, res) => {
 
 export const allToday = async (req, res) => {
   try {
-    const data = await getAllTodayAttendance();
+    const { date, month, year } = req.query;
+    const data = await getAllTodayAttendance({ date, month, year });
     res.json({ attendance: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -59,6 +62,29 @@ export const monthlyReport = async (req, res) => {
       return res.status(400).json({ error: "month and year required" });
     }
     const data = await getMonthlyReport(month, year);
+    res.json({ attendance: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const allHistory = async (req, res) => {
+  try {
+    const data = await getAllAttendance();
+    res.json({ attendance: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const employeeHistory = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { date, month, year } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+    const data = await getMyAttendance(userId, { date, month, year });
     res.json({ attendance: data });
   } catch (err) {
     res.status(500).json({ error: err.message });

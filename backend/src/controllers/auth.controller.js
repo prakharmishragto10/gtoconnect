@@ -4,6 +4,8 @@ import {
   getAllUsers,
   updatePassword,
   createEmployee,
+  deleteEmployee,
+  updateEmployee,
 } from "../services/auth.service.js";
 
 export const login = async (req, res) => {
@@ -97,6 +99,28 @@ export const signupEmployee = async (req, res) => {
       base_salary,
     });
     res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const removeEmployee = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+    const result = await deleteEmployee(userId);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const editEmployee = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+    const result = await updateEmployee(userId, req.body);
+    res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

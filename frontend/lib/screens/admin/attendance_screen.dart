@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../core/colors.dart';
 import '../../core/responsive.dart';
 import '../../services/attendance_service.dart';
 import '../../services/auth_service.dart';
+import 'employee_history_screen.dart';
+
+enum AttendanceFilterMode { day, month, year }
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -16,8 +20,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _loading = true;
   String? _error;
 
-  // Merged list: one entry per employee
+  AttendanceFilterMode _filterMode = AttendanceFilterMode.day;
+  DateTime _selectedDate = DateTime.now();
+  int _selectedMonth = DateTime.now().month;
+  int _selectedYear = DateTime.now().year;
+
+  // Merged list: one entry per employee (Day mode) or raw check-in entries (Month/Year mode)
   List<_EmpAttEntry> _entries = [];
+  List<dynamic> _rawRecords = [];
 
   @override
   void initState() {
@@ -25,82 +35,209 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     _loadData();
   }
 
+  String _formatDateYMD(DateTime dt) {
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _loadData() async {
     setState(() {
       _loading = true;
       _error = null;
     });
+
     try {
-      // Fetch all employees + today's check-ins in parallel
-      final results = await Future.wait([
-        AuthService.getEmployees(),
-        AttendanceService.getAllToday(),
-      ]);
+      if (_filterMode == AttendanceFilterMode.day) {
+        final dateStr = _formatDateYMD(_selectedDate);
+        final results = await Future.wait([
+          AuthService.getEmployees(),
+          AttendanceService.getAllToday(date: dateStr),
+        ]);
 
-      final employees = results[0] as List<dynamic>;
-      final checkins = results[1] as List<dynamic>;
+        final employees = results[0];
+        final checkins = results[1];
 
-      // Build a lookup: userId → attendance record
-      final attMap = <String, Map<String, dynamic>>{};
-      for (final att in checkins) {
-        final uid = (att['user_id'] ?? att['users']?['id'])?.toString();
-        if (uid != null) attMap[uid] = att as Map<String, dynamic>;
+        final attMap = <String, Map<String, dynamic>>{};
+        for (final att in checkins) {
+          final uid = (att['user_id'] ?? att['users']?['id'])?.toString();
+          if (uid != null) attMap[uid] = att as Map<String, dynamic>;
+        }
+
+        final entries = employees.map((emp) {
+          final id = emp['id']?.toString() ?? '';
+          final att = attMap[id];
+          return _EmpAttEntry.fromRaw(id, emp as Map<String, dynamic>, att);
+        }).toList();
+
+        entries.sort((a, b) {
+          const order = {'present': 0, 'late': 1, 'absent': 2};
+          return (order[a.status] ?? 3).compareTo(order[b.status] ?? 3);
+        });
+
+        if (mounted) {
+          setState(() {
+            _entries = entries;
+            _rawRecords = checkins;
+            _loading = false;
+          });
+        }
+      } else if (_filterMode == AttendanceFilterMode.month) {
+        final records = await AttendanceService.getAllToday(
+          month: _selectedMonth,
+          year: _selectedYear,
+        );
+
+        if (mounted) {
+          setState(() {
+            _rawRecords = records;
+            _loading = false;
+          });
+        }
+      } else {
+        // Year mode
+        final records = await AttendanceService.getAllToday(
+          year: _selectedYear,
+        );
+
+        if (mounted) {
+          setState(() {
+            _rawRecords = records;
+            _loading = false;
+          });
+        }
       }
-
-      // Merge
-      final entries = employees.map((emp) {
-        final id = emp['id']?.toString() ?? '';
-        final att = attMap[id];
-        return _EmpAttEntry.fromRaw(emp as Map<String, dynamic>, att);
-      }).toList();
-
-      // Sort: present/late first, absent last
-      entries.sort((a, b) {
-        const order = {'present': 0, 'late': 1, 'absent': 2};
-        return (order[a.status] ?? 3).compareTo(order[b.status] ?? 3);
-      });
-
-      setState(() {
-        _entries = entries;
-        _loading = false;
-      });
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _loading = false;
+        });
+      }
     }
   }
 
   // ── Summary counts ───────────────────────────────────────────────────────────
-  int get _presentCount => _entries.where((e) => e.status == 'present').length;
-  int get _lateCount => _entries.where((e) => e.status == 'late').length;
-  int get _absentCount => _entries.where((e) => e.status == 'absent').length;
+  int get _presentCount {
+    if (_filterMode == AttendanceFilterMode.day) {
+      return _entries.where((e) => e.status == 'present').length;
+    }
+    return _rawRecords.where((r) => r['status'] == 'present').length;
+  }
 
-  // ── Month label ──────────────────────────────────────────────────────────────
-  static const _months = [
-    '',
-    'JANUARY',
-    'FEBRUARY',
-    'MARCH',
-    'APRIL',
-    'MAY',
-    'JUNE',
-    'JULY',
-    'AUGUST',
-    'SEPTEMBER',
-    'OCTOBER',
-    'NOVEMBER',
-    'DECEMBER',
+  int get _lateCount {
+    if (_filterMode == AttendanceFilterMode.day) {
+      return _entries.where((e) => e.status == 'late').length;
+    }
+    return _rawRecords.where((r) => r['status'] == 'late').length;
+  }
+
+  int get _absentCount {
+    if (_filterMode == AttendanceFilterMode.day) {
+      return _entries.where((e) => e.status == 'absent').length;
+    }
+    return 0;
+  }
+
+  int get _totalCount {
+    if (_filterMode == AttendanceFilterMode.day) {
+      return _entries.length;
+    }
+    return _rawRecords.length;
+  }
+
+  static const _monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
   ];
-  String get _monthLabel {
-    final now = DateTime.now();
-    return '${_months[now.month]} ${now.year}';
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: kDeepBlue,
+              onPrimary: Colors.white,
+              onSurface: kDeepBlue,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _selectedMonth = picked.month;
+        _selectedYear = picked.year;
+      });
+      _loadData();
+    }
+  }
+
+  void _nextPeriod() {
+    setState(() {
+      if (_filterMode == AttendanceFilterMode.day) {
+        _selectedDate = _selectedDate.add(const Duration(days: 1));
+        _selectedMonth = _selectedDate.month;
+        _selectedYear = _selectedDate.year;
+      } else if (_filterMode == AttendanceFilterMode.month) {
+        if (_selectedMonth == 12) {
+          _selectedMonth = 1;
+          _selectedYear++;
+        } else {
+          _selectedMonth++;
+        }
+      } else {
+        _selectedYear++;
+      }
+    });
+    _loadData();
+  }
+
+  void _prevPeriod() {
+    setState(() {
+      if (_filterMode == AttendanceFilterMode.day) {
+        _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+        _selectedMonth = _selectedDate.month;
+        _selectedYear = _selectedDate.year;
+      } else if (_filterMode == AttendanceFilterMode.month) {
+        if (_selectedMonth == 1) {
+          _selectedMonth = 12;
+          _selectedYear--;
+        } else {
+          _selectedMonth--;
+        }
+      } else {
+        _selectedYear--;
+      }
+    });
+    _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDesktop = Responsive.isDesktop(context);
+
+    String filterHeaderLabel;
+    if (_filterMode == AttendanceFilterMode.day) {
+      final now = DateTime.now();
+      final isToday = _selectedDate.year == now.year &&
+          _selectedDate.month == now.month &&
+          _selectedDate.day == now.day;
+      filterHeaderLabel = isToday
+          ? 'TODAY, ${DateFormat('dd MMM yyyy').format(_selectedDate).toUpperCase()}'
+          : DateFormat('EEEE, dd MMM yyyy').format(_selectedDate).toUpperCase();
+    } else if (_filterMode == AttendanceFilterMode.month) {
+      filterHeaderLabel =
+          '${_monthNames[_selectedMonth - 1].toUpperCase()} $_selectedYear';
+    } else {
+      filterHeaderLabel = 'YEAR $_selectedYear';
+    }
 
     return RefreshIndicator(
       color: kDeepBlue,
@@ -114,29 +251,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header ─────────────────────────────────────────────────
+                // ── Sub-header label ───────────────────────────────────────
                 Text(
-                  _monthLabel,
+                  filterHeaderLabel,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: kTealGray,
                     letterSpacing: 1.2,
                   ),
                 ),
                 const SizedBox(height: 4),
+
+                // ── Title & Refresh ────────────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Team Attendance',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.w700,
                         color: kDeepBlue,
                       ),
                     ),
-                    // Refresh button
                     IconButton(
                       onPressed: _loading ? null : _loadData,
                       icon: const Icon(Icons.refresh, size: 20),
@@ -144,6 +282,147 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       tooltip: 'Refresh',
                     ),
                   ],
+                ),
+                const SizedBox(height: 14),
+
+                // ── Mode Switcher & Date Controls ──────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      // Toggle buttons for Day / Month / Year
+                      Row(
+                        children: [
+                          _buildFilterTab(
+                            title: 'Day',
+                            icon: Icons.calendar_today_outlined,
+                            isSelected: _filterMode == AttendanceFilterMode.day,
+                            onTap: () {
+                              if (_filterMode != AttendanceFilterMode.day) {
+                                setState(() => _filterMode = AttendanceFilterMode.day);
+                                _loadData();
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFilterTab(
+                            title: 'Month',
+                            icon: Icons.calendar_view_month_outlined,
+                            isSelected: _filterMode == AttendanceFilterMode.month,
+                            onTap: () {
+                              if (_filterMode != AttendanceFilterMode.month) {
+                                setState(() => _filterMode = AttendanceFilterMode.month);
+                                _loadData();
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFilterTab(
+                            title: 'Year',
+                            icon: Icons.date_range_outlined,
+                            isSelected: _filterMode == AttendanceFilterMode.year,
+                            onTap: () {
+                              if (_filterMode != AttendanceFilterMode.year) {
+                                setState(() => _filterMode = AttendanceFilterMode.year);
+                                _loadData();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const Divider(color: kBorder, height: 20),
+
+                      // Navigator bar
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            onPressed: _prevPeriod,
+                            icon: const Icon(Icons.chevron_left, color: kDeepBlue),
+                            tooltip: 'Previous',
+                            splashRadius: 20,
+                          ),
+                          InkWell(
+                            onTap: _filterMode == AttendanceFilterMode.day
+                                ? _pickDate
+                                : null,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _filterMode == AttendanceFilterMode.day
+                                        ? Icons.edit_calendar_outlined
+                                        : Icons.event,
+                                    size: 16,
+                                    color: kDeepBlue,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _getPeriodDisplayName(),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: kDeepBlue,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_filterMode == AttendanceFilterMode.day)
+                                TextButton(
+                                  onPressed: () {
+                                    final now = DateTime.now();
+                                    setState(() {
+                                      _selectedDate = now;
+                                      _selectedMonth = now.month;
+                                      _selectedYear = now.year;
+                                    });
+                                    _loadData();
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: kDeepBlue,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    'Today',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              IconButton(
+                                onPressed: _nextPeriod,
+                                icon: const Icon(Icons.chevron_right, color: kDeepBlue),
+                                tooltip: 'Next',
+                                splashRadius: 20,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -165,15 +444,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         color: kWarn,
                         bg: kWarnBg,
                       ),
+                      if (_filterMode == AttendanceFilterMode.day)
+                        _SummaryChip(
+                          label: 'Absent',
+                          value: '$_absentCount',
+                          color: kDanger,
+                          bg: kDangerBg,
+                        ),
                       _SummaryChip(
-                        label: 'Absent',
-                        value: '$_absentCount',
-                        color: kDanger,
-                        bg: kDangerBg,
-                      ),
-                      _SummaryChip(
-                        label: 'Total',
-                        value: '${_entries.length}',
+                        label: _filterMode == AttendanceFilterMode.day
+                            ? 'Total Team'
+                            : 'Check-ins',
+                        value: '$_totalCount',
                         color: kDeepBlue,
                         bg: kInfoBg,
                       ),
@@ -192,12 +474,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   )
                 else if (_error != null)
                   _ErrorState(message: _error!, onRetry: _loadData)
-                else if (_entries.isEmpty)
-                  _EmptyState()
+                else if (_filterMode == AttendanceFilterMode.day)
+                  _entries.isEmpty
+                      ? _EmptyState(text: 'No employee records found')
+                      : isDesktop
+                          ? _DesktopGrid(entries: _entries)
+                          : _MobileList(entries: _entries)
                 else
-                  isDesktop
-                      ? _DesktopGrid(entries: _entries)
-                      : _MobileList(entries: _entries),
+                  _rawRecords.isEmpty
+                      ? _EmptyState(
+                          text: _filterMode == AttendanceFilterMode.month
+                              ? 'No attendance records in ${_monthNames[_selectedMonth - 1]} $_selectedYear'
+                              : 'No attendance records in $_selectedYear',
+                        )
+                      : _MonthYearRecordsList(records: _rawRecords),
               ],
             ),
           ),
@@ -205,10 +495,61 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
     );
   }
+
+  Widget _buildFilterTab({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? kDeepBlue : kOffWhite,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? Colors.white : kTealGray,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : kTealGray,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getPeriodDisplayName() {
+    if (_filterMode == AttendanceFilterMode.day) {
+      return DateFormat('dd MMM yyyy').format(_selectedDate);
+    } else if (_filterMode == AttendanceFilterMode.month) {
+      return '${_monthNames[_selectedMonth - 1]} $_selectedYear';
+    } else {
+      return '$_selectedYear';
+    }
+  }
 }
 
-// ── Data model ────────────────────────────────────────────────────────────────
+// ── Data model for Day mode ───────────────────────────────────────────────────
 class _EmpAttEntry {
+  final String id;
   final String name;
   final String role;
   final String location;
@@ -217,6 +558,7 @@ class _EmpAttEntry {
   final String checkOut;
 
   const _EmpAttEntry({
+    required this.id,
     required this.name,
     required this.role,
     required this.location,
@@ -226,6 +568,7 @@ class _EmpAttEntry {
   });
 
   factory _EmpAttEntry.fromRaw(
+    String id,
     Map<String, dynamic> emp,
     Map<String, dynamic>? att,
   ) {
@@ -235,8 +578,8 @@ class _EmpAttEntry {
       final h = dt.hour > 12
           ? dt.hour - 12
           : dt.hour == 0
-          ? 12
-          : dt.hour;
+              ? 12
+              : dt.hour;
       final m = dt.minute.toString().padLeft(2, '0');
       final ampm = dt.hour >= 12 ? 'PM' : 'AM';
       return '$h:$m $ampm';
@@ -244,6 +587,7 @@ class _EmpAttEntry {
 
     final status = att?['status']?.toString() ?? 'absent';
     return _EmpAttEntry(
+      id: id,
       name: emp['name']?.toString() ?? 'Unknown',
       role: emp['designation']?.toString() ?? emp['role']?.toString() ?? '—',
       location: emp['location']?.toString() ?? '—',
@@ -292,7 +636,7 @@ class _MobileList extends StatelessWidget {
   }
 }
 
-// ── Employee card ─────────────────────────────────────────────────────────────
+// ── Employee card (Day Mode) ──────────────────────────────────────────────────
 class _EmployeeAttCard extends StatelessWidget {
   final _EmpAttEntry entry;
   const _EmployeeAttCard({required this.entry});
@@ -304,107 +648,267 @@ class _EmployeeAttCard extends StatelessWidget {
     final Color sc = isPresent
         ? kForest
         : isLate
-        ? kWarn
-        : kDanger;
+            ? kWarn
+            : kDanger;
     final Color sb = isPresent
         ? kSuccessBg
         : isLate
-        ? kWarnBg
-        : kDangerBg;
+            ? kWarnBg
+            : kDangerBg;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Top row: avatar + name + status badge ─────────────────────────
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: kInfoBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    entry.initials,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: kDeepBlue,
-                    ),
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmployeeHistoryScreen(
+              employeeId: entry.id,
+              employeeName: entry.name,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kBorder),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: kInfoBg,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.name,
+                  child: Center(
+                    child: Text(
+                      entry.initials,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                         color: kDeepBlue,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      '${entry.role} · ${entry.location}',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: kTealGray,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: sb,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  entry.status,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: sc,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // ── Bottom row: check-in / check-out chips ────────────────────────
-          Row(
-            children: [
-              _InfoChip(icon: Icons.login, label: 'In', value: entry.checkIn),
-              const SizedBox(width: 8),
-              _InfoChip(
-                icon: Icons.logout,
-                label: 'Out',
-                value: entry.checkOut,
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.name,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kDeepBlue,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${entry.role} · ${entry.location}',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          color: kTealGray,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: sb,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    entry.status,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: sc,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _InfoChip(icon: Icons.login, label: 'In', value: entry.checkIn),
+                const SizedBox(width: 8),
+                _InfoChip(icon: Icons.logout, label: 'Out', value: entry.checkOut),
+              ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+// ── Records List for Month / Year Mode ────────────────────────────────────────
+class _MonthYearRecordsList extends StatelessWidget {
+  final List<dynamic> records;
+  const _MonthYearRecordsList({required this.records});
+
+  String _fmtDate(String? raw) {
+    if (raw == null) return '—';
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      return DateFormat('dd MMM yyyy').format(dt);
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  String _fmtTime(String? raw) {
+    if (raw == null) return '—';
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      final h = dt.hour > 12 ? dt.hour - 12 : dt.hour == 0 ? 12 : dt.hour;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      return '$h:$m $ampm';
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: records.length,
+      itemBuilder: (context, index) {
+        final r = records[index];
+        final user = r['users'] as Map<String, dynamic>?;
+        final name = user?['name']?.toString() ?? 'Employee';
+        final role = user?['designation']?.toString() ?? '—';
+        final status = r['status']?.toString() ?? 'present';
+        final isPresent = status == 'present';
+        final isLate = status == 'late';
+
+        final Color sc = isPresent ? kForest : isLate ? kWarn : kDanger;
+        final Color sb = isPresent ? kSuccessBg : isLate ? kWarnBg : kDangerBg;
+
+        return InkWell(
+          onTap: () {
+            final uid = (r['user_id'] ?? user?['id'])?.toString();
+            if (uid != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EmployeeHistoryScreen(
+                    employeeId: uid,
+                    employeeName: name,
+                  ),
+                ),
+              );
+            }
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: kInfoBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: kDeepBlue,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kDeepBlue,
+                        ),
+                      ),
+                      Text(
+                        '${_fmtDate(r['date'])} · $role',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: kTealGray,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          _InfoChip(
+                            icon: Icons.login,
+                            label: 'In',
+                            value: _fmtTime(r['checked_in_at']),
+                          ),
+                          const SizedBox(width: 8),
+                          _InfoChip(
+                            icon: Icons.logout,
+                            label: 'Out',
+                            value: _fmtTime(r['checked_out_at']),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: sb,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    status,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: sc,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -467,7 +971,7 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: kOffWhite,
         borderRadius: BorderRadius.circular(6),
@@ -475,7 +979,7 @@ class _InfoChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: kTealGray),
+          Icon(icon, size: 11, color: kTealGray),
           const SizedBox(width: 4),
           Text(
             '$label: ',
@@ -497,6 +1001,9 @@ class _InfoChip extends StatelessWidget {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
+  final String text;
+  const _EmptyState({this.text = 'No attendance records found'});
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -505,18 +1012,19 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           children: [
             Icon(
-              Icons.people_outline,
+              Icons.event_busy_outlined,
               size: 40,
               color: kTealGray.withOpacity(0.5),
             ),
             const SizedBox(height: 12),
             Text(
-              'No employees found',
+              text,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 14,
                 color: kTealGray,
                 fontWeight: FontWeight.w500,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

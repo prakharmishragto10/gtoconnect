@@ -142,3 +142,39 @@ export const createEmployee = async ({
 
   return { message: "Employee created successfully", user };
 };
+
+export const deleteEmployee = async (userId) => {
+  // Prevent deleting admins via this route
+  const { data: user, error: fetchError } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .single();
+
+  if (fetchError || !user) throw new Error("User not found");
+  if (user.role === "admin") throw new Error("Cannot delete an admin account");
+
+  const { error } = await supabase.from("users").delete().eq("id", userId);
+
+  if (error) throw new Error(error.message);
+  return { message: "Employee deleted successfully" };
+};
+
+export const updateEmployee = async (userId, fields) => {
+  const allowed = ["name", "designation", "location", "upi_id", "base_salary"];
+  const updates = {};
+  for (const key of allowed) {
+    if (fields[key] !== undefined) updates[key] = fields[key];
+  }
+  if (Object.keys(updates).length === 0) throw new Error("No valid fields to update");
+
+  const { data, error } = await supabase
+    .from("users")
+    .update(updates)
+    .eq("id", userId)
+    .select("id, name, email, role, designation, location, upi_id, base_salary")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { message: "Employee updated successfully", user: data };
+};

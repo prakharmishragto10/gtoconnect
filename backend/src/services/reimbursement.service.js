@@ -70,6 +70,20 @@ export const updateClaimStatus = async (claimId, status, reviewerId) => {
     throw new Error("Invalid status");
   }
 
+  // Fetch current claim to enforce status progression
+  const { data: currentClaim, error: fetchError } = await supabase
+    .from("reimbursements")
+    .select("status")
+    .eq("id", claimId)
+    .single();
+
+  if (fetchError || !currentClaim) throw new Error("Claim not found");
+
+  // Enforce: Must be approved before marking as paid
+  if (status === "paid" && currentClaim.status !== "approved") {
+    throw new Error("Claim must be approved before it can be marked as paid");
+  }
+
   const { data, error } = await supabase
     .from("reimbursements")
     .update({

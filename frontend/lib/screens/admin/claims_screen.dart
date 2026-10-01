@@ -42,10 +42,14 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Claim $status',
+            'Claim marked as $status',
             style: GoogleFonts.plusJakartaSans(fontSize: 13),
           ),
-          backgroundColor: status == 'approved' ? kForest : kDanger,
+          backgroundColor: status == 'approved'
+              ? kForest
+              : status == 'paid'
+                  ? kDeepBlue
+                  : kDanger,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -90,7 +94,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
             ),
           ),
           Text(
-            'Review and approve claims',
+            'Review, approve, and disburse claims',
             style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
           ),
           const SizedBox(height: 16),
@@ -109,7 +113,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
               _SummaryCard(
                 label: 'Approved',
                 value: '${approved.length}',
-                sub: 'This month',
+                sub: 'Ready to pay',
                 color: kForest,
                 bg: kSuccessBg,
               ),
@@ -117,7 +121,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
               _SummaryCard(
                 label: 'Paid',
                 value: '${paid.length}',
-                sub: 'This month',
+                sub: 'Completed',
                 color: kDeepBlue,
                 bg: kInfoBg,
               ),
@@ -141,9 +145,15 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
           ],
 
           if (approved.isNotEmpty) ...[
-            _SectionLabel('APPROVED'),
+            _SectionLabel('APPROVED (READY FOR PAYMENT)'),
             const SizedBox(height: 8),
-            ...approved.map((c) => _ClaimCard(claim: c)),
+            ...approved.map(
+              (c) => _ClaimCard(
+                claim: c,
+                onMarkPaid: () => _updateStatus(_claims.indexOf(c), 'paid'),
+                onReject: () => _updateStatus(_claims.indexOf(c), 'rejected'),
+              ),
+            ),
             const SizedBox(height: 16),
           ],
 
@@ -248,7 +258,14 @@ class _ClaimCard extends StatelessWidget {
   final Map<String, dynamic> claim;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
-  const _ClaimCard({required this.claim, this.onApprove, this.onReject});
+  final VoidCallback? onMarkPaid;
+
+  const _ClaimCard({
+    required this.claim,
+    this.onApprove,
+    this.onReject,
+    this.onMarkPaid,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +312,7 @@ class _ClaimCard extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    name.substring(0, 1),
+                    name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -461,6 +478,59 @@ class _ClaimCard extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (onMarkPaid != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (onReject != null) ...[
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton(
+                      onPressed: onReject,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kDanger,
+                        side: const BorderSide(color: kDanger),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      child: Text(
+                        'Reject',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: onMarkPaid,
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: Text(
+                      'Mark as Paid',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kDeepBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
                 ),
