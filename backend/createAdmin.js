@@ -7,8 +7,8 @@ dotenv.config();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function createAdmin() {
-  const email = "gracyhr.gto@gmail.com"; // You can change this
-  const password = "Gracyhr@globetrekovereas.137"; // You can change this
+  const email = "username@gmail.com"; // You can change this
+  const password = "Password"; // You can change this
   const name = "Admin User";
 
   console.log(`Creating admin with email: ${email}...`);
