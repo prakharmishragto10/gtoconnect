@@ -350,38 +350,22 @@ class _AdminTravelScreenState extends State<AdminTravelScreen> {
           const Divider(height: 1, color: kBorder),
           const SizedBox(height: 12),
 
-          // Destination + dates
-          Row(
-            children: [
-              const Icon(Icons.place_outlined, size: 15, color: kBlueGray),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  place,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: kDeepBlue,
-                  ),
-                ),
-              ),
-            ],
+          _infoRow(
+            Icons.event_outlined,
+            'Travel Date',
+            start.isNotEmpty ? _fmtDate(start) : '—',
           ),
-          if (start.isNotEmpty && end.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.only(left: 21),
-              child: Text(
-                '${_fmtDate(start)} → ${_fmtDate(end)}',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  color: kTealGray,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-
+          const SizedBox(height: 6),
+          _infoRow(
+            Icons.date_range_outlined,
+            'Period',
+            (start.isNotEmpty && end.isNotEmpty)
+                ? '${_fmtDate(start)} → ${_fmtDate(end)}'
+                : '—',
+          ),
+          const SizedBox(height: 6),
+          _infoRow(Icons.place_outlined, 'Place', place),
+          const SizedBox(height: 6),
           _infoRow(Icons.work_outline, 'Work', work),
           const SizedBox(height: 6),
           _infoRow(Icons.info_outline, 'Reason', reason),
