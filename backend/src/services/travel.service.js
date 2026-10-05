@@ -41,7 +41,7 @@ export const getMyTravelRequests = async (userId) => {
 export const getAllTravelRequests = async (status = null) => {
   let query = supabase
     .from("travel_requests")
-    .select("*, users(id, name, email)")
+    .select("*")
     .order("created_at", { ascending: false });
 
   if (status) {
@@ -50,7 +50,19 @@ export const getAllTravelRequests = async (status = null) => {
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return data;
+
+  const enriched = await Promise.all(
+    (data || []).map(async (req) => {
+      const { data: user } = await supabase
+        .from("users")
+        .select("id, name, email, designation, location")
+        .eq("id", req.user_id)
+        .single();
+      return { ...req, users: user, submitter: user };
+    })
+  );
+
+  return enriched;
 };
 
 export const updateTravelStatus = async (id, status, adminId) => {
