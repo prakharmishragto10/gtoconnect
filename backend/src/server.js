@@ -13,6 +13,7 @@ import reimbursementRoutes from "./routes/reimbursements.js";
 import salaryRoutes from "./routes/salary.js";
 import paymentRoutes from "./routes/payments.js";
 import uploadRoutes from "./routes/upload.js";
+import travelRoutes from "./routes/travel.js";
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use("/api/reimbursements", reimbursementRoutes);
 app.use("/api/salary", salaryRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/travel", travelRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "GTO API is running", version: "1.0.0" });

@@ -8,10 +8,12 @@ import '../../services/attendance_service.dart';
 import '../../services/reimbursement_service.dart';
 import '../../services/salary_service.dart';
 import '../../services/location_service.dart';
+import '../../services/travel_service.dart';
 import '../login_screen.dart';
 import 'emp_attendance.dart';
 import 'emp_reimbursement.dart';
 import 'emp_salary.dart';
+import 'emp_travel.dart';
 
 class EmployeeHome extends StatefulWidget {
   final UserModel user;
@@ -38,6 +40,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
     EmpAttendance(user: widget.user),
     EmpReimbursement(user: widget.user),
     EmpSalary(user: widget.user),
+    EmpTravel(user: widget.user),
   ];
 
   static const _navItems = [
@@ -45,6 +48,7 @@ class _EmployeeHomeState extends State<EmployeeHome> {
     (Icons.access_time_outlined, Icons.access_time, 'Attendance'),
     (Icons.receipt_outlined, Icons.receipt, 'Claims'),
     (Icons.payments_outlined, Icons.payments, 'Salary'),
+    (Icons.flight_outlined, Icons.flight, 'Travel'),
   ];
 
   @override
@@ -151,6 +155,7 @@ class _DesktopLayout extends StatelessWidget {
     (Icons.access_time_outlined, Icons.access_time, 'Attendance'),
     (Icons.receipt_outlined, Icons.receipt, 'Claims'),
     (Icons.payments_outlined, Icons.payments, 'Salary'),
+    (Icons.flight_outlined, Icons.flight, 'Travel'),
   ];
 
   const _DesktopLayout({
@@ -288,6 +293,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
   String _netSalary = '—';
   int _claimsPending = 0;
   String _claimsPaid = '₹0';
+  int _travelCount = 0;
   List<dynamic> _recentClaims = [];
 
   @override
@@ -349,6 +355,12 @@ class _EmpDashboardState extends State<EmpDashboard> {
         (s, c) => s + (c['amount'] as num).toDouble(),
       );
 
+      int travelCount = 0;
+      try {
+        final travel = await TravelService.getMyRequests();
+        travelCount = travel.length;
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _daysPresent = present;
@@ -357,6 +369,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
               : '—';
           _claimsPending = pending.length;
           _claimsPaid = '₹${paidTotal.toStringAsFixed(0)}';
+          _travelCount = travelCount;
           _recentClaims = claims.take(3).toList();
           _loading = false;
         });
@@ -700,16 +713,23 @@ class _EmpDashboardState extends State<EmpDashboard> {
         kDeepBlue,
         kInfoBg,
       ),
+      _StatData(
+        'Travel Requests',
+        '$_travelCount',
+        Icons.flight_outlined,
+        kDeepBlue,
+        kInfoBg,
+      ),
     ];
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isDesktop ? 4 : 2,
+        crossAxisCount: isDesktop ? 5 : 2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
-        childAspectRatio: isDesktop ? 1.5 : 1.7,
+        childAspectRatio: isDesktop ? 1.3 : 1.7,
       ),
       itemCount: cards.length,
       itemBuilder: (_, i) => _EmpStatCard(data: cards[i]),

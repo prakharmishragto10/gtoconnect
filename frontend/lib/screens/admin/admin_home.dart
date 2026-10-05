@@ -13,6 +13,7 @@ import 'employees_screen.dart';
 import 'claims_screen.dart';
 import 'salary_screen.dart';
 import 'location_screen.dart';
+import 'admin_travel_screen.dart';
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 typedef _NavItem = ({IconData icon, IconData activeIcon, String label});
@@ -35,6 +36,7 @@ const List<_NavItem> _navItems = [
   ),
   (icon: Icons.receipt_outlined, activeIcon: Icons.receipt, label: 'Claims'),
   (icon: Icons.payments_outlined, activeIcon: Icons.payments, label: 'Salary'),
+  (icon: Icons.flight_outlined, activeIcon: Icons.flight, label: 'Travel'),
   (icon: Icons.people_outline, activeIcon: Icons.people, label: 'Team'),
 ];
 
@@ -60,6 +62,7 @@ class _AdminHomeState extends State<AdminHome> {
       const LocationScreen(),
       const ClaimsScreen(),
       const SalaryScreen(),
+      const AdminTravelScreen(),
       const EmployeesScreen(),
     ];
   }
