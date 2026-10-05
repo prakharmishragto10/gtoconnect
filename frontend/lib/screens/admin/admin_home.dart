@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../services/attendance_service.dart';
 import '../../services/reimbursement_service.dart';
 import '../../services/location_service.dart';
+import '../../services/travel_service.dart';
 import '../login_screen.dart';
 import 'attendance_screen.dart';
 import 'employees_screen.dart';
@@ -306,6 +307,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   int _totalEmp = 0;
   int _presentToday = 0;
   int _pendingClaims = 0;
+  int _pendingTravel = 0;
   String _salaryTotal = '—';
   List<dynamic> _todayAttendance = [];
   List<dynamic> _recentClaims = [];
@@ -328,6 +330,11 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       final employees = await AuthService.getEmployees();
       final attendance = await AttendanceService.getAllToday();
       final claims = await ReimbursementService.getAllClaims(status: 'pending');
+      int pendingTravelCount = 0;
+      try {
+        final travel = await TravelService.getAllRequests(status: 'pending');
+        pendingTravelCount = travel.length;
+      } catch (_) {}
 
       // ── Fix 1: Calculate salary total from employee base_salary ──────────
       final totalSalary = employees.fold<num>(
@@ -346,6 +353,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         _totalEmp = employees.length;
         _presentToday = uniqueAttendance.length;
         _pendingClaims = claims.length;
+        _pendingTravel = pendingTravelCount;
         _salaryTotal = totalSalary > 0
             ? '₹${(totalSalary / 1000).toStringAsFixed(0)}K'
             : '—';
@@ -497,16 +505,23 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         color: kDeepBlue,
         bg: kInfoBg,
       ),
+      (
+        label: 'Pending Travel',
+        value: '$_pendingTravel',
+        icon: Icons.flight_outlined,
+        color: kWarn,
+        bg: kWarnBg,
+      ),
     ];
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isDesktop ? 4 : 2,
+        crossAxisCount: isDesktop ? 5 : 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: isDesktop ? 1.6 : 1.7,
+        childAspectRatio: isDesktop ? 1.4 : 1.7,
       ),
       itemCount: cards.length,
       itemBuilder: (_, i) {
