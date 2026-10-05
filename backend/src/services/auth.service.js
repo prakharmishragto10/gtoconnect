@@ -43,6 +43,7 @@ export const loginUser = async (email, password) => {
       location: user.location,
       upi_id: user.upi_id,
       base_salary: user.base_salary,
+      joining_date: user.joining_date,
     },
   };
 };
@@ -50,7 +51,7 @@ export const loginUser = async (email, password) => {
 export const getMe = async (userId) => {
   const { data: user, error } = await supabase
     .from("users")
-    .select("id, name, email, role, designation, location, upi_id, base_salary")
+    .select("id, name, email, role, designation, location, upi_id, base_salary, joining_date")
     .eq("id", userId)
     .single();
 
@@ -64,7 +65,7 @@ export const getMe = async (userId) => {
 export const getAllUsers = async () => {
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, email, role, designation, location, upi_id, base_salary")
+    .select("id, name, email, role, designation, location, upi_id, base_salary, joining_date")
     .eq("role", "employee")
     .order("name");
 
@@ -79,11 +80,6 @@ export const updatePassword = async (email, password) => {
     .select("*")
     .eq("email", email.toLowerCase().trim())
     .single();
-  // ADD THIS 👇
-  console.log("Looking for email:", email.toLowerCase().trim());
-  console.log("Supabase result - user:", user);
-  console.log("Supabase result - error:", JSON.stringify(error));
-
   if (error || !user) throw new Error("User not found");
 
   // 2. Hash password using bcrypt
@@ -109,6 +105,7 @@ export const createEmployee = async ({
   location,
   upi_id,
   base_salary,
+  joining_date,
 }) => {
   // 1. Check if email already exists
   const { data: existing } = await supabase
@@ -134,8 +131,9 @@ export const createEmployee = async ({
       location: location?.trim() || null,
       upi_id: upi_id?.trim() || null,
       base_salary: base_salary || null,
+      joining_date: joining_date || null,
     })
-    .select("id, name, email, role, designation, location, upi_id, base_salary")
+    .select("id, name, email, role, designation, location, upi_id, base_salary, joining_date")
     .single();
 
   if (error) throw new Error(error.message);
@@ -161,7 +159,7 @@ export const deleteEmployee = async (userId) => {
 };
 
 export const updateEmployee = async (userId, fields) => {
-  const allowed = ["name", "designation", "location", "upi_id", "base_salary"];
+  const allowed = ["name", "designation", "location", "upi_id", "base_salary", "joining_date"];
   const updates = {};
   for (const key of allowed) {
     if (fields[key] !== undefined) updates[key] = fields[key];
@@ -172,7 +170,7 @@ export const updateEmployee = async (userId, fields) => {
     .from("users")
     .update(updates)
     .eq("id", userId)
-    .select("id, name, email, role, designation, location, upi_id, base_salary")
+    .select("id, name, email, role, designation, location, upi_id, base_salary, joining_date")
     .single();
 
   if (error) throw new Error(error.message);

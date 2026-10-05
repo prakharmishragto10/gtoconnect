@@ -122,6 +122,9 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     final locCtrl = TextEditingController(text: _emp['location']?.toString() ?? '');
     final salaryCtrl = TextEditingController(text: _emp['base_salary']?.toString() ?? '');
     final upiCtrl = TextEditingController(text: _emp['upi_id']?.toString() ?? '');
+    DateTime? sheetJoiningDate = _emp['joining_date'] != null
+        ? DateTime.tryParse(_emp['joining_date'].toString())
+        : null;
     bool saving = false;
 
     showModalBottomSheet(
@@ -209,6 +212,86 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                         label: 'UPI ID',
                         icon: Icons.payments_outlined,
                       ),
+                      const SizedBox(height: 12),
+                      // ── Joining Date picker ──────────────────────────────────
+                      StatefulBuilder(
+                        builder: (_, setDateState) => InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: sheetJoiningDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                              builder: (ctx, child) => Theme(
+                                data: Theme.of(ctx).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: kDeepBlue,
+                                  ),
+                                ),
+                                child: child!,
+                              ),
+                            );
+                            if (picked != null) {
+                              setDateState(() => sheetJoiningDate = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kOffWhite.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 18,
+                                  color: kTealGray,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Joining Date',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          color: kTealGray,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        sheetJoiningDate != null
+                                            ? '${sheetJoiningDate!.day.toString().padLeft(2, '0')}/${sheetJoiningDate!.month.toString().padLeft(2, '0')}/${sheetJoiningDate!.year}'
+                                            : 'Tap to select date',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 13,
+                                          color: sheetJoiningDate != null
+                                              ? kDeepBlue
+                                              : kTealGray,
+                                          fontWeight: sheetJoiningDate != null
+                                              ? FontWeight.w500
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: kTealGray,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
@@ -218,6 +301,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                               : () async {
                                   if (!formKey.currentState!.validate()) return;
                                   setSheetState(() => saving = true);
+                                  final messenger = ScaffoldMessenger.of(context);
 
                                   try {
                                     final salaryVal = salaryCtrl.text.trim().isNotEmpty
@@ -232,6 +316,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                                         'location': locCtrl.text.trim(),
                                         'base_salary': salaryVal,
                                         'upi_id': upiCtrl.text.trim(),
+                                        if (sheetJoiningDate != null)
+                                          'joining_date': sheetJoiningDate!.toIso8601String().split('T')[0],
                                       },
                                     );
 
@@ -245,11 +331,14 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                                           _emp['location'] = locCtrl.text.trim();
                                           _emp['base_salary'] = salaryVal;
                                           _emp['upi_id'] = upiCtrl.text.trim();
+                                          if (sheetJoiningDate != null) {
+                                            _emp['joining_date'] = sheetJoiningDate!.toIso8601String().split('T')[0];
+                                          }
                                         }
                                       });
                                       widget.onUpdated?.call();
                                       Navigator.pop(ctx);
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      messenger.showSnackBar(
                                         SnackBar(
                                           content: Text(
                                             'Employee details updated successfully',
@@ -261,17 +350,15 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                                     }
                                   } catch (e) {
                                     setSheetState(() => saving = false);
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            e.toString().replaceAll('Exception: ', ''),
-                                            style: GoogleFonts.plusJakartaSans(),
-                                          ),
-                                          backgroundColor: kDanger,
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          e.toString().replaceAll('Exception: ', ''),
+                                          style: GoogleFonts.plusJakartaSans(),
                                         ),
-                                      );
-                                    }
+                                        backgroundColor: kDanger,
+                                      ),
+                                    );
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
@@ -359,6 +446,13 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     final salary = _emp['base_salary'];
     final upiId = _emp['upi_id']?.toString() ?? '—';
     final role = _emp['role']?.toString() ?? 'employee';
+    final joiningDateRaw = _emp['joining_date'];
+    final joiningDate = joiningDateRaw != null
+        ? DateTime.tryParse(joiningDateRaw.toString())
+        : null;
+    final joiningDateStr = joiningDate != null
+        ? '${joiningDate.day.toString().padLeft(2, '0')}/${joiningDate.month.toString().padLeft(2, '0')}/${joiningDate.year}'
+        : '—';
 
     return Scaffold(
       backgroundColor: kOffWhite,
@@ -543,6 +637,11 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     icon: Icons.payments_outlined,
                     label: 'UPI ID',
                     value: upiId.isNotEmpty ? upiId : '—',
+                  ),
+                  _DetailRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Joining Date',
+                    value: joiningDateStr,
                     isLast: true,
                   ),
                 ],

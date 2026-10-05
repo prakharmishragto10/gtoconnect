@@ -7,6 +7,7 @@ class UserModel {
   final String? location;
   final String? upiId;
   final double baseSalary;
+  final DateTime? joiningDate;
 
   UserModel({
     required this.id,
@@ -17,6 +18,7 @@ class UserModel {
     this.location,
     this.upiId,
     this.baseSalary = 15000,
+    this.joiningDate,
   });
 
   bool get isAdmin => role == 'admin';
@@ -31,5 +33,8 @@ class UserModel {
     location: j['location'],
     upiId: j['upi_id'],
     baseSalary: (j['base_salary'] ?? 15000).toDouble(),
+    joiningDate: j['joining_date'] != null
+        ? DateTime.tryParse(j['joining_date'].toString())
+        : null,
   );
 }

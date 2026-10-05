@@ -67,6 +67,7 @@ export const signupEmployee = async (req, res) => {
       location,
       upi_id,
       base_salary,
+      joining_date,
     } = req.body;
 
     // Required fields
@@ -97,6 +98,7 @@ export const signupEmployee = async (req, res) => {
       location,
       upi_id,
       base_salary,
+      joining_date,
     });
     res.status(201).json(result);
   } catch (err) {

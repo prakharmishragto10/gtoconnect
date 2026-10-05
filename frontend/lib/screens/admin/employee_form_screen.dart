@@ -29,6 +29,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   late final TextEditingController _location;
   late final TextEditingController _upiId;
   late final TextEditingController _salary;
+  DateTime? _joiningDate;
 
   @override
   void initState() {
@@ -43,6 +44,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _salary      = TextEditingController(
       text: e?['base_salary'] != null ? e!['base_salary'].toString() : '',
     );
+    if (e?['joining_date'] != null) {
+      _joiningDate = DateTime.tryParse(e!['joining_date'].toString());
+    }
   }
 
   @override
@@ -72,6 +76,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         if (_salary.text.trim().isNotEmpty) {
           fields['base_salary'] = num.tryParse(_salary.text.trim());
         }
+        if (_joiningDate != null) {
+          fields['joining_date'] = _joiningDate!.toIso8601String().split('T')[0];
+        }
         await AuthService.updateEmployee(widget.emp!['id'].toString(), fields);
       } else {
         // Create new employee
@@ -85,6 +92,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
           baseSalary: _salary.text.trim().isNotEmpty
               ? num.tryParse(_salary.text.trim())
               : null,
+          joiningDate: _joiningDate,
         );
       }
 
@@ -198,6 +206,84 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 controller: _location,
                 label: 'Location / Branch',
                 icon: Icons.location_on_outlined,
+              ),
+              // ── Joining Date picker ────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _joiningDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                      builder: (ctx, child) => Theme(
+                        data: Theme.of(ctx).copyWith(
+                          colorScheme: const ColorScheme.light(
+                            primary: kDeepBlue,
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (picked != null) setState(() => _joiningDate = picked);
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                          color: kBlueGray,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Joining Date',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: kTealGray,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _joiningDate != null
+                                    ? '${_joiningDate!.day.toString().padLeft(2, '0')}/${_joiningDate!.month.toString().padLeft(2, '0')}/${_joiningDate!.year}'
+                                    : 'Tap to select date',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: _joiningDate != null
+                                      ? kDeepBlue
+                                      : kTealGray,
+                                  fontWeight: _joiningDate != null
+                                      ? FontWeight.w500
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_drop_down,
+                          color: kBlueGray,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 16),

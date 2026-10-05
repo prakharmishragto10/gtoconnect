@@ -49,6 +49,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
     bool obscurePassword = true;
     bool submitting = false;
+    DateTime? joiningDate;
 
     showModalBottomSheet(
       context: context,
@@ -207,6 +208,86 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                         label: 'UPI ID',
                         icon: Icons.payments_outlined,
                       ),
+                      const SizedBox(height: 12),
+                      // ── Joining Date picker ─────────────────────────────────
+                      StatefulBuilder(
+                        builder: (_, setDateState) => InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: joiningDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                              builder: (ctx, child) => Theme(
+                                data: Theme.of(ctx).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: kDeepBlue,
+                                  ),
+                                ),
+                                child: child!,
+                              ),
+                            );
+                            if (picked != null) {
+                              setDateState(() => joiningDate = picked);
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kOffWhite.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 18,
+                                  color: kTealGray,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Joining Date',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          color: kTealGray,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        joiningDate != null
+                                            ? '${joiningDate!.day.toString().padLeft(2, '0')}/${joiningDate!.month.toString().padLeft(2, '0')}/${joiningDate!.year}'
+                                            : 'Tap to select date',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 13,
+                                          color: joiningDate != null
+                                              ? kDeepBlue
+                                              : kTealGray,
+                                          fontWeight: joiningDate != null
+                                              ? FontWeight.w500
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: kTealGray,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
@@ -216,6 +297,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                               : () async {
                                   if (!formKey.currentState!.validate()) return;
                                   setSheetState(() => submitting = true);
+                                  final messenger = ScaffoldMessenger.of(context);
 
                                   try {
                                     final salaryVal = salaryCtrl.text.trim().isNotEmpty
@@ -230,12 +312,13 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                       location: locCtrl.text.trim(),
                                       baseSalary: salaryVal,
                                       upiId: upiCtrl.text.trim(),
+                                      joiningDate: joiningDate,
                                     );
 
                                     if (mounted) {
                                       Navigator.pop(ctx);
                                       _loadEmployees();
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      messenger.showSnackBar(
                                         SnackBar(
                                           content: Text(
                                             'Employee created successfully',
@@ -247,17 +330,15 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                                     }
                                   } catch (e) {
                                     setSheetState(() => submitting = false);
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            e.toString().replaceAll('Exception: ', ''),
-                                            style: GoogleFonts.plusJakartaSans(),
-                                          ),
-                                          backgroundColor: kDanger,
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          e.toString().replaceAll('Exception: ', ''),
+                                          style: GoogleFonts.plusJakartaSans(),
                                         ),
-                                      );
-                                    }
+                                        backgroundColor: kDanger,
+                                      ),
+                                    );
                                   }
                                 },
                           style: ElevatedButton.styleFrom(

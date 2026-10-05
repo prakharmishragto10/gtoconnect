@@ -17,7 +17,8 @@ export const generateMonthlySalary = async (month, year) => {
 
   for (const emp of employees) {
     const from = `${year}-${String(month).padStart(2, "0")}-01`;
-    const to = `${year}-${String(month).padStart(2, "0")}-31`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     const { data: claims } = await supabase
       .from("reimbursements")

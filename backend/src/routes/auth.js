@@ -16,8 +16,8 @@ router.post("/login", login);
 router.get("/me", auth, me);
 router.get("/employees", auth, adminOnly, employees);
 
-router.patch("/updatepass", updatePass);
-router.post("/signup", signupEmployee);
+router.patch("/updatepass", auth, adminOnly, updatePass);
+router.post("/signup", auth, adminOnly, signupEmployee);
 router.delete("/employees/:userId", auth, adminOnly, removeEmployee);
 router.patch("/employees/:userId", auth, adminOnly, editEmployee);
 

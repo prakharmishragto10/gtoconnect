@@ -48,6 +48,7 @@ class AuthService {
     String? location,
     String? upiId,
     num? baseSalary,
+    DateTime? joiningDate,
   }) async {
     final data = await Api.post(
       '/api/auth/signup',
@@ -60,6 +61,8 @@ class AuthService {
         if (location != null && location.isNotEmpty) 'location': location,
         if (upiId != null && upiId.isNotEmpty) 'upi_id': upiId,
         if (baseSalary != null) 'base_salary': baseSalary,
+        if (joiningDate != null)
+          'joining_date': joiningDate.toIso8601String().split('T')[0],
       },
     );
     return data;
