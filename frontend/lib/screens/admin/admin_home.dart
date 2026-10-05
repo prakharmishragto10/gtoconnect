@@ -6,7 +6,7 @@ import '../../models/user.dart';
 import '../../services/auth_service.dart';
 import '../../services/attendance_service.dart';
 import '../../services/reimbursement_service.dart';
-import '../../services/salary_service.dart';
+import '../../services/location_service.dart';
 import '../login_screen.dart';
 import 'attendance_screen.dart';
 import 'employees_screen.dart';
@@ -322,7 +322,6 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
 
   Future<void> _loadData() async {
     try {
-      final now = DateTime.now();
       final employees = await AuthService.getEmployees();
       final attendance = await AttendanceService.getAllToday();
       final claims = await ReimbursementService.getAllClaims(status: 'pending');
@@ -880,12 +879,36 @@ class _AttendanceTile extends StatelessWidget {
                     color: kDeepBlue,
                   ),
                 ),
-                Text(
-                  '$role · $location',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
-                    color: kTealGray,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        role,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          color: kTealGray,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (location.isNotEmpty && location != '—') ...[
+                      const SizedBox(width: 4),
+                      Text('·', style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTealGray)),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: LocationNameBadge(
+                          rawLocation: location,
+                          iconSize: 11,
+                          iconColor: kForest,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: kDeepBlue,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

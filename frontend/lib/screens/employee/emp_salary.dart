@@ -73,7 +73,6 @@ class _EmpSalaryState extends State<EmpSalary> {
     final isPaid = selected['status'] == 'paid';
     final base = (selected['base_salary'] as num).toDouble();
     final reimb = (selected['reimbursements'] as num).toDouble();
-    final net = (selected['net_salary'] as num).toDouble();
     final month = _monthName(selected['month'] as int);
     final year = selected['year'].toString();
 
@@ -277,7 +276,6 @@ class _EmpSalaryState extends State<EmpSalary> {
 
           ..._salaries.map((s) {
             final isPaidS = s['status'] == 'paid';
-            final netS = (s['net_salary'] as num).toDouble();
             final monthS = _monthName(s['month'] as int);
             final yearS = s['year'].toString();
             return Container(

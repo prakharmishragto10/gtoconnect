@@ -357,8 +357,8 @@ class _LocationScreenState extends State<LocationScreen> {
                 name: name,
                 role: role,
                 city: city,
-                lat: lat.toStringAsFixed(4),
-                lng: lng.toStringAsFixed(4),
+                lat: lat,
+                lng: lng,
                 lastSeen: time,
                 color: color,
                 onTap: () {
@@ -373,7 +373,8 @@ class _LocationScreenState extends State<LocationScreen> {
 }
 
 class _LocationCard extends StatelessWidget {
-  final String name, role, city, lat, lng, lastSeen;
+  final String name, role, city, lastSeen;
+  final double lat, lng;
   final Color color;
   final VoidCallback onTap;
 
@@ -440,31 +441,34 @@ class _LocationCard extends StatelessWidget {
                       color: kTealGray,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 11,
-                        color: kBlueGray,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        city,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: kDeepBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    '$lat°N  $lng°E',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      color: kTealGray,
-                    ),
+                  const SizedBox(height: 4),
+                  FutureBuilder<String?>(
+                    future: LocationService.getAddressFromCoords(lat, lng),
+                    builder: (context, snapshot) {
+                      final place = snapshot.data ?? (city != '—' ? city : 'Live Location');
+                      return Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            size: 13,
+                            color: kForest,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              place,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: kDeepBlue,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

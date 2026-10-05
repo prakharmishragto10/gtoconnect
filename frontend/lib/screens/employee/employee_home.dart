@@ -277,10 +277,13 @@ class EmpDashboard extends StatefulWidget {
 
 class _EmpDashboardState extends State<EmpDashboard> {
   bool _isOnDuty = false;
+  bool _alreadyDone = false;
   bool _dutyToggling = false;
   bool _locationSharing = false;
   bool _loading = true;
   String _checkInTime = '--:--';
+  String _checkOutTime = '--:--';
+  String? _liveLocationName;
   int _daysPresent = 0;
   String _netSalary = '—';
   int _claimsPending = 0;
@@ -306,18 +309,37 @@ class _EmpDashboardState extends State<EmpDashboard> {
       if (today != null) {
         final checkedIn = today['checked_in_at'] != null;
         final checkedOut = today['checked_out_at'] != null;
-        if (checkedIn && !checkedOut) {
+        if (checkedIn) {
           final dt = DateTime.parse(today['checked_in_at']).toLocal();
           _checkInTime =
               '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-          _isOnDuty = true;
+        }
+        if (checkedOut) {
+          final dt = DateTime.parse(today['checked_out_at']).toLocal();
+          _checkOutTime =
+              '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        }
+
+        _isOnDuty = checkedIn && !checkedOut;
+        _alreadyDone = checkedIn && checkedOut;
+
+        if (_isOnDuty) {
+          _locationSharing = LocationService.isTracking;
+          LocationService.getCurrentLocationName().then((name) {
+            if (name != null && mounted) {
+              setState(() => _liveLocationName = name);
+            }
+          });
         }
       }
-      final history = await AttendanceService.getMyHistory();
+      final now = DateTime.now();
+      final history = await AttendanceService.getMyHistory(
+        month: now.month,
+        year: now.year,
+      );
       final present = history
           .where((h) => h['status'] == 'present' || h['status'] == 'late')
           .length;
-      final now = DateTime.now();
       final salary = await SalaryService.getMySalary(now.month, now.year);
       final claims = await ReimbursementService.getMyClaims();
       final pending = claims.where((c) => c['status'] == 'pending').toList();
@@ -327,46 +349,116 @@ class _EmpDashboardState extends State<EmpDashboard> {
         (s, c) => s + (c['amount'] as num).toDouble(),
       );
 
-      setState(() {
-        _daysPresent = present;
-        _netSalary = salary != null
-            ? '₹${(salary['base_salary'] as num).toStringAsFixed(0)}'
-            : '—';
-        _claimsPending = pending.length;
-        _claimsPaid = '₹${paidTotal.toStringAsFixed(0)}';
-        _recentClaims = claims.take(3).toList();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _daysPresent = present;
+          _netSalary = salary != null
+              ? '₹${(salary['base_salary'] as num).toStringAsFixed(0)}'
+              : '—';
+          _claimsPending = pending.length;
+          _claimsPaid = '₹${paidTotal.toStringAsFixed(0)}';
+          _recentClaims = claims.take(3).toList();
+          _loading = false;
+        });
+      }
     } catch (_) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _toggleDuty() async {
-    if (_dutyToggling) return;
+    if (_dutyToggling || _alreadyDone) return;
     setState(() => _dutyToggling = true);
     try {
       if (_isOnDuty) {
         await AttendanceService.checkOut();
+        LocationService.stopTracking();
+        final now = DateTime.now();
         setState(() {
           _isOnDuty = false;
-          _checkInTime = '--:--';
+          _alreadyDone = true;
+          _locationSharing = false;
+          _checkOutTime =
+              '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Checked out successfully',
+                style: GoogleFonts.plusJakartaSans(fontSize: 13),
+              ),
+              backgroundColor: kForest,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        }
       } else {
-        final att = await AttendanceService.checkIn();
+        // 1. Mandatory Location check
+        final pos = await LocationService.ensureLocationForCheckIn();
+        final place = await LocationService.getAddressFromCoords(
+          pos.latitude,
+          pos.longitude,
+        );
+
+        // 2. Check in with coordinates
+        final att = await AttendanceService.checkIn(
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+        );
+
+        // 3. Start location tracking
+        try {
+          await LocationService.startTracking();
+        } catch (_) {}
+
         final dt = DateTime.parse(att['checked_in_at']).toLocal();
+        final status = att['status']?.toString() ?? 'present';
+        final isLate = status == 'late';
+
         setState(() {
           _isOnDuty = true;
+          _alreadyDone = false;
+          _locationSharing = true;
+          _liveLocationName = place;
           _checkInTime =
               '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+          _checkOutTime = '--:--';
         });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isLate
+                    ? 'Checked in (Late - after 10:45 AM)'
+                    : 'Checked in successfully',
+                style: GoogleFonts.plusJakartaSans(fontSize: 13),
+              ),
+              backgroundColor: isLate ? kWarn : kForest,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        }
       }
+      _loadData();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
+          content: Text(
+            e.toString().replaceAll('Exception: ', ''),
+            style: GoogleFonts.plusJakartaSans(fontSize: 13),
+          ),
           backgroundColor: kDanger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     }
@@ -427,7 +519,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        _greeting(), // ← was 'Good morning,'
+        _greeting(),
         style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kBlueGray),
       ),
       Text(
@@ -443,25 +535,41 @@ class _EmpDashboardState extends State<EmpDashboard> {
         children: [
           _Badge(widget.user.designation ?? 'Employee'),
           const SizedBox(width: 8),
-          _Badge(widget.user.location ?? '—', icon: Icons.location_on_outlined),
+          _Badge(
+            _liveLocationName ?? widget.user.location ?? '—',
+            icon: Icons.location_on_outlined,
+          ),
         ],
       ),
     ],
   );
+
   Widget _dutyToggleWidget() => Row(
     children: [
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: _isOnDuty ? kSuccessBg : kDangerBg,
+          color: _alreadyDone
+              ? kInfoBg
+              : _isOnDuty
+              ? kSuccessBg
+              : kDangerBg,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
-          _isOnDuty ? 'On Duty' : 'Off Duty',
+          _alreadyDone
+              ? 'Completed'
+              : _isOnDuty
+              ? 'On Duty'
+              : 'Off Duty',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: _isOnDuty ? kForest : kDanger,
+            color: _alreadyDone
+                ? kDeepBlue
+                : _isOnDuty
+                ? kForest
+                : kDanger,
           ),
         ),
       ),
@@ -481,10 +589,23 @@ class _EmpDashboardState extends State<EmpDashboard> {
                 ),
               ),
             )
-          : _Toggle(value: _isOnDuty, onTap: _toggleDuty),
+          : _Toggle(
+              value: _isOnDuty,
+              onTap: _alreadyDone ? null : _toggleDuty,
+            ),
     ],
   );
+
   Widget _buildToggles() {
+    String attSubtitle;
+    if (_alreadyDone) {
+      attSubtitle = 'Completed (Out at $_checkOutTime)';
+    } else if (_isOnDuty) {
+      attSubtitle = 'Checked in at $_checkInTime';
+    } else {
+      attSubtitle = 'Not checked in';
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -499,7 +620,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
             children: [
               _ToggleInfo(
                 'Attendance',
-                _isOnDuty ? 'Checked in at $_checkInTime' : 'Not checked in',
+                attSubtitle,
               ),
               _dutyToggleWidget(),
             ],
@@ -511,7 +632,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
               _ToggleInfo(
                 'Location Sharing',
                 _locationSharing
-                    ? '${widget.user.location ?? "Sharing"} — live'
+                    ? '${_liveLocationName ?? widget.user.location ?? "Live"} — active'
                     : 'Location off',
               ),
               _Toggle(
@@ -523,7 +644,11 @@ class _EmpDashboardState extends State<EmpDashboard> {
                   } else {
                     try {
                       await LocationService.startTracking();
-                      setState(() => _locationSharing = true);
+                      final place = await LocationService.getCurrentLocationName();
+                      setState(() {
+                        _locationSharing = true;
+                        if (place != null) _liveLocationName = place;
+                      });
                     } catch (e) {
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -567,6 +692,13 @@ class _EmpDashboardState extends State<EmpDashboard> {
         Icons.done_all,
         kForest,
         kSuccessBg,
+      ),
+      _StatData(
+        'Salary',
+        _netSalary,
+        Icons.payments_outlined,
+        kDeepBlue,
+        kInfoBg,
       ),
     ];
 
@@ -678,7 +810,7 @@ class _Badge extends StatelessWidget {
 
 class _Toggle extends StatelessWidget {
   final bool value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _Toggle({required this.value, required this.onTap});
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -688,7 +820,11 @@ class _Toggle extends StatelessWidget {
       width: 46,
       height: 26,
       decoration: BoxDecoration(
-        color: value ? kForest : const Color(0xFFCDD5D5),
+        color: onTap == null
+            ? const Color(0xFFD0D7DE)
+            : value
+            ? kForest
+            : const Color(0xFFCDD5D5),
         borderRadius: BorderRadius.circular(13),
       ),
       child: AnimatedAlign(

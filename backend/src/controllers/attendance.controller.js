@@ -10,7 +10,8 @@ import {
 
 export const checkin = async (req, res) => {
   try {
-    const data = await checkIn(req.user.id);
+    const { latitude, longitude } = req.body || {};
+    const data = await checkIn(req.user.id, { latitude, longitude });
     res.json({ message: "Checked in successfully", attendance: data });
   } catch (err) {
     res.status(400).json({ error: err.message });

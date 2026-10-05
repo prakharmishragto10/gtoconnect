@@ -111,7 +111,6 @@ class _SalaryScreenState extends State<SalaryScreen> {
     final monthLabel = '${_monthNames[_month]} $_year';
     final gross = (_summary['gross'] as num?)?.toDouble() ?? 0;
     final reimb = (_summary['reimbursements'] as num?)?.toDouble() ?? 0;
-    final net = (_summary['net'] as num?)?.toDouble() ?? 0;
     final paid = (_summary['paid'] as num?)?.toInt() ?? 0;
     final pend = (_summary['pending'] as num?)?.toInt() ?? 0;
 
@@ -259,7 +258,6 @@ class _SalaryScreenState extends State<SalaryScreen> {
               final user = s['users'] as Map<String, dynamic>?;
               final name = user?['name'] ?? 'Unknown';
               final isPaid = s['status'] == 'paid';
-              final sNet = (s['net_salary'] as num).toDouble();
               final sBase = (s['base_salary'] as num).toDouble();
               final sReimb = (s['reimbursements'] as num).toDouble();
 

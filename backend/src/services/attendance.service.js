@@ -1,7 +1,16 @@
 import supabase from "../config/supabase.js";
+import { updateLocation } from "./location.service.js";
 
-export const checkIn = async (userId) => {
-  const today = new Date().toISOString().split("T")[0];
+const getTodayDate = () => {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().split("T")[0];
+  }
+};
+
+export const checkIn = async (userId, locationData = null) => {
+  const today = getTodayDate();
 
   const { data: existing } = await supabase
     .from("attendance")
@@ -15,8 +24,27 @@ export const checkIn = async (userId) => {
   }
 
   const checkinTime = new Date();
-  const hour = checkinTime.getHours();
-  const status = hour >= 10 ? "late" : "present";
+  
+  // Calculate hour and minute in Asia/Kolkata (IST) timezone
+  let hour = checkinTime.getHours();
+  let minute = checkinTime.getMinutes();
+  try {
+    const istFormatter = new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    });
+    const parts = istFormatter.formatToParts(checkinTime);
+    const h = parts.find((p) => p.type === "hour")?.value;
+    const m = parts.find((p) => p.type === "minute")?.value;
+    if (h != null) hour = parseInt(h, 10);
+    if (m != null) minute = parseInt(m, 10);
+  } catch (_) {}
+
+  // After 10:45 AM is marked as "late"
+  const isLate = hour > 10 || (hour === 10 && minute > 45);
+  const status = isLate ? "late" : "present";
 
   const { data, error } = await supabase
     .from("attendance")
@@ -30,11 +58,18 @@ export const checkIn = async (userId) => {
     .single();
 
   if (error) throw new Error(error.message);
+
+  if (locationData && locationData.latitude != null && locationData.longitude != null) {
+    try {
+      await updateLocation(userId, locationData.latitude, locationData.longitude);
+    } catch (_) {}
+  }
+
   return data;
 };
 
 export const checkOut = async (userId) => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayDate();
 
   const { data: existing } = await supabase
     .from("attendance")
@@ -58,7 +93,7 @@ export const checkOut = async (userId) => {
 };
 
 export const getTodayStatus = async (userId) => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayDate();
 
   const { data, error } = await supabase
     .from("attendance")
@@ -80,8 +115,11 @@ export const getMyAttendance = async (userId, filters = {}) => {
   if (filters.date) {
     query = query.eq("date", filters.date);
   } else if (filters.month && filters.year) {
-    const from = new Date(filters.year, filters.month - 1, 1).toISOString().split("T")[0];
-    const to = new Date(filters.year, filters.month, 0).toISOString().split("T")[0];
+    const m = String(filters.month).padStart(2, "0");
+    const y = String(filters.year);
+    const lastDay = new Date(Number(filters.year), Number(filters.month), 0).getDate();
+    const from = `${y}-${m}-01`;
+    const to = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
     query = query.gte("date", from).lte("date", to);
   } else if (filters.year) {
     const from = `${filters.year}-01-01`;
@@ -103,15 +141,18 @@ export const getAllTodayAttendance = async (filters = {}) => {
   if (filters.date) {
     query = query.eq("date", filters.date);
   } else if (filters.month && filters.year) {
-    const from = new Date(filters.year, filters.month - 1, 1).toISOString().split("T")[0];
-    const to = new Date(filters.year, filters.month, 0).toISOString().split("T")[0];
+    const m = String(filters.month).padStart(2, "0");
+    const y = String(filters.year);
+    const lastDay = new Date(Number(filters.year), Number(filters.month), 0).getDate();
+    const from = `${y}-${m}-01`;
+    const to = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
     query = query.gte("date", from).lte("date", to);
   } else if (filters.year) {
     const from = `${filters.year}-01-01`;
     const to = `${filters.year}-12-31`;
     query = query.gte("date", from).lte("date", to);
   } else {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayDate();
     query = query.eq("date", today);
   }
 
@@ -122,13 +163,11 @@ export const getAllTodayAttendance = async (filters = {}) => {
 };
 
 export const getMonthlyReport = async (month, year) => {
-  const from = new Date(year, month - 1, 1)
-    .toISOString()
-    .split("T")[0];
-
-  const to = new Date(year, month, 0)
-    .toISOString()
-    .split("T")[0];
+  const m = String(month).padStart(2, "0");
+  const y = String(year);
+  const lastDay = new Date(Number(year), Number(month), 0).getDate();
+  const from = `${y}-${m}-01`;
+  const to = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
 
   const { data, error } = await supabase
     .from("attendance")

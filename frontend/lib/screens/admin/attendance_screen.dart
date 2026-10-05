@@ -5,6 +5,7 @@ import '../../core/colors.dart';
 import '../../core/responsive.dart';
 import '../../services/attendance_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/location_service.dart';
 import 'employee_history_screen.dart';
 
 enum AttendanceFilterMode { day, month, year }
@@ -714,13 +715,36 @@ class _EmployeeAttCard extends StatelessWidget {
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        '${entry.role} · ${entry.location}',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          color: kTealGray,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              entry.role,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                color: kTealGray,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (entry.location.isNotEmpty && entry.location != '—') ...[
+                            const SizedBox(width: 4),
+                            Text('·', style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTealGray)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: LocationNameBadge(
+                                rawLocation: entry.location,
+                                iconSize: 11,
+                                iconColor: kForest,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: kDeepBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -863,12 +887,36 @@ class _MonthYearRecordsList extends StatelessWidget {
                           color: kDeepBlue,
                         ),
                       ),
-                      Text(
-                        '${_fmtDate(r['date'])} · $role',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          color: kTealGray,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '${_fmtDate(r['date'])} · $role',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                color: kTealGray,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if ((user?['location']?.toString() ?? '').isNotEmpty && user?['location'] != '—') ...[
+                            const SizedBox(width: 4),
+                            Text('·', style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kTealGray)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: LocationNameBadge(
+                                rawLocation: user!['location'].toString(),
+                                iconSize: 11,
+                                iconColor: kForest,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: kDeepBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Row(

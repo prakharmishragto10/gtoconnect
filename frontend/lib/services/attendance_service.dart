@@ -2,8 +2,17 @@ import 'api.dart';
 
 class AttendanceService {
   // ── Check In ──────────────────────────────────────────
-  static Future<Map<String, dynamic>> checkIn() async {
-    final data = await Api.post('/api/attendance/checkin');
+  static Future<Map<String, dynamic>> checkIn({
+    double? latitude,
+    double? longitude,
+  }) async {
+    final body = <String, dynamic>{};
+    if (latitude != null) body['latitude'] = latitude;
+    if (longitude != null) body['longitude'] = longitude;
+    final data = await Api.post(
+      '/api/attendance/checkin',
+      body: body.isNotEmpty ? body : null,
+    );
     return data['attendance'];
   }
 
