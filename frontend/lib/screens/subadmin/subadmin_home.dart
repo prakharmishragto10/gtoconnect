@@ -183,7 +183,7 @@ class _SubAdminDesktopLayout extends StatelessWidget {
                   duration: const Duration(milliseconds: 150),
                   decoration: BoxDecoration(
                     color: active
-                        ? Colors.white.withOpacity(0.08)
+                        ? Colors.white.withValues(alpha: 0.08)
                         : Colors.transparent,
                     border: Border(
                       left: BorderSide(
@@ -203,7 +203,7 @@ class _SubAdminDesktopLayout extends StatelessWidget {
                         size: 18,
                         color: active
                             ? Colors.white
-                            : Colors.white.withOpacity(0.45),
+                            : Colors.white.withValues(alpha: 0.45),
                       ),
                       const SizedBox(width: 10),
                       Text(
@@ -215,7 +215,7 @@ class _SubAdminDesktopLayout extends StatelessWidget {
                               : FontWeight.w400,
                           color: active
                               ? Colors.white
-                              : Colors.white.withOpacity(0.45),
+                              : Colors.white.withValues(alpha: 0.45),
                         ),
                       ),
                     ],
@@ -250,7 +250,7 @@ class _AppBarAvatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundColor: Colors.white.withOpacity(0.15),
+          backgroundColor: Colors.white.withValues(alpha: 0.15),
           child: Text(
             initials,
             style: GoogleFonts.plusJakartaSans(
@@ -435,7 +435,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
           ? Row(
               children: [
                 Expanded(child: greetingContent),
-                if (quickStats != null) quickStats,
+                ?quickStats,
               ],
             )
           : greetingContent,

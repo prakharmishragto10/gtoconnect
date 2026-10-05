@@ -310,7 +310,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kDeepBlue,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: kDeepBlue.withOpacity(0.5),
+                    disabledBackgroundColor: kDeepBlue.withValues(alpha: 0.5),
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),

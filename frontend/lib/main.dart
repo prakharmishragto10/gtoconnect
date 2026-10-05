@@ -104,11 +104,11 @@ class SplashPainter extends CustomPainter {
     canvas.translate(center.dx, center.dy);
     canvas.rotate(angle);
 
-    final bodyPaint = Paint()..color = Colors.white.withOpacity(0.95);
-    final wingPaint = Paint()..color = Colors.white.withOpacity(0.85);
-    final dimPaint = Paint()..color = Colors.white.withOpacity(0.60);
+    final bodyPaint = Paint()..color = Colors.white.withValues(alpha: 0.95);
+    final wingPaint = Paint()..color = Colors.white.withValues(alpha: 0.85);
+    final dimPaint = Paint()..color = Colors.white.withValues(alpha: 0.60);
     final windowPaint = Paint()
-      ..color = const Color(0xFF87C4FF).withOpacity(0.75);
+      ..color = const Color(0xFF87C4FF).withValues(alpha: 0.75);
 
     // Fuselage
     final fuselage = Path()
@@ -174,7 +174,7 @@ class SplashPainter extends CustomPainter {
     // ── Stars ────────────────────────────────────────────────────────────────
     final starPaint = Paint();
     for (int i = 0; i < stars.length; i++) {
-      starPaint.color = Colors.white.withOpacity(starBrightness[i] * 0.5);
+      starPaint.color = Colors.white.withValues(alpha: starBrightness[i] * 0.5);
       canvas.drawCircle(
         Offset(stars[i].dx * size.width, stars[i].dy * size.height),
         starBrightness[i] * 1.2 + 0.3,
@@ -191,14 +191,14 @@ class SplashPainter extends CustomPainter {
     // ── Trail particles ───────────────────────────────────────────────────────
     for (final p in particles) {
       final particlePaint = Paint()
-        ..color = const Color(0xFF78BEFF).withOpacity(p.life * 0.45);
+        ..color = const Color(0xFF78BEFF).withValues(alpha: p.life * 0.45);
       canvas.drawCircle(p.position, p.radius * p.life, particlePaint);
     }
 
     // ── Glow ─────────────────────────────────────────────────────────────────
     final glow = Paint()
       ..shader = RadialGradient(
-        colors: [const Color(0xFF64B4FF).withOpacity(0.20), Colors.transparent],
+        colors: [const Color(0xFF64B4FF).withValues(alpha: 0.20), Colors.transparent],
       ).createShader(Rect.fromCircle(center: planePos, radius: 55));
     canvas.drawCircle(planePos, 55, glow);
 
@@ -395,7 +395,7 @@ class _SplashScreenState extends State<SplashScreen>
               Color.fromARGB(255, 190, 205, 228),
               Color.fromARGB(255, 8, 27, 66),
             ],
-            stops: const [0.0, 0.5, 1.0],
+            stops: [0.0, 0.5, 1.0],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

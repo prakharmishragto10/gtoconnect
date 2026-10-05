@@ -362,7 +362,7 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                   padding: const EdgeInsets.all(40),
                   child: Column(
                     children: [
-                      Icon(Icons.event_busy_outlined, size: 40, color: kTealGray.withOpacity(0.5)),
+                      Icon(Icons.event_busy_outlined, size: 40, color: kTealGray.withValues(alpha: 0.5)),
                       const SizedBox(height: 12),
                       Text(
                         'No attendance records found for selected period',

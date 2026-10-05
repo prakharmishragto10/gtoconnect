@@ -242,7 +242,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: kOffWhite.withOpacity(0.5),
+                              color: kOffWhite.withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: kBorder),
                             ),
@@ -419,7 +419,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         labelStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
         prefixIcon: Icon(icon, size: 18, color: kTealGray),
         filled: true,
-        fillColor: kOffWhite.withOpacity(0.5),
+        fillColor: kOffWhite.withValues(alpha: 0.5),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -675,7 +675,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kDanger,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: kDanger.withOpacity(0.5),
+                  disabledBackgroundColor: kDanger.withValues(alpha: 0.5),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),

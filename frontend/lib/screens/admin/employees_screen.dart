@@ -156,7 +156,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                             },
                           ),
                           filled: true,
-                          fillColor: kOffWhite.withOpacity(0.5),
+                          fillColor: kOffWhite.withValues(alpha: 0.5),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 12,
@@ -238,7 +238,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                               vertical: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: kOffWhite.withOpacity(0.5),
+                              color: kOffWhite.withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: kBorder),
                             ),
@@ -399,7 +399,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         labelStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
         prefixIcon: Icon(icon, size: 18, color: kTealGray),
         filled: true,
-        fillColor: kOffWhite.withOpacity(0.5),
+        fillColor: kOffWhite.withValues(alpha: 0.5),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),

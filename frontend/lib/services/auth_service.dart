@@ -60,7 +60,7 @@ class AuthService {
           'designation': designation,
         if (location != null && location.isNotEmpty) 'location': location,
         if (upiId != null && upiId.isNotEmpty) 'upi_id': upiId,
-        if (baseSalary != null) 'base_salary': baseSalary,
+        'base_salary': ?baseSalary,
         if (joiningDate != null)
           'joining_date': joiningDate.toIso8601String().split('T')[0],
       },

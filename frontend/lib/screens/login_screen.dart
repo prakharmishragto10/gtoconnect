@@ -28,7 +28,7 @@ class _StarPainter extends CustomPainter {
     final paint = Paint();
     for (int i = 0; i < stars.length; i++) {
       final opacity = (brightness[i] * 0.75).clamp(0.0, 1.0);
-      paint.color = Colors.white.withOpacity(opacity);
+      paint.color = Colors.white.withValues(alpha: opacity);
       canvas.drawCircle(
         Offset(stars[i].dx * size.width, stars[i].dy * size.height),
         brightness[i] * 1.5 + 0.3,
@@ -191,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen>
                       border: Border.all(color: _border),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
+                          color: Colors.black.withValues(alpha: 0.12),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
