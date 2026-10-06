@@ -78,6 +78,11 @@ class _EmpAttendanceState extends State<EmpAttendance> {
         _isOnDuty = checkedIn && !checkedOut;
         _alreadyDone = checkedIn && checkedOut;
         if (_isOnDuty) {
+          if (!LocationService.isTracking) {
+            try {
+              await LocationService.startTracking();
+            } catch (_) {}
+          }
           _locationOn = LocationService.isTracking;
           LocationService.getCurrentLocationName().then((name) {
             if (name != null && mounted) {
