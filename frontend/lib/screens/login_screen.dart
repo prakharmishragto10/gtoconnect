@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/responsive.dart';
 import '../services/auth_service.dart';
@@ -16,29 +17,46 @@ const _bg = Color(0xFFF0F4F8);
 const _card = Color(0xFFFFFFFF);
 const _border = Color(0xFFD6E0E8);
 
-// ─── STAR PAINTER ─────────────────────────────────────────────────────────────
+const _headerGradient = LinearGradient(
+  colors: [
+    Color.fromARGB(255, 8, 27, 66),
+    Color.fromARGB(255, 190, 205, 228),
+    Color.fromARGB(255, 8, 27, 66),
+  ],
+  stops: [0.0, 0.5, 1.0],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+// ─── STAR PAINTER (repaints via animation, no setState) ──────────────────────
 class _StarPainter extends CustomPainter {
   final List<Offset> stars;
-  final List<double> brightness;
+  final List<double> phases;
+  final Animation<double> animation;
 
-  _StarPainter({required this.stars, required this.brightness});
+  _StarPainter({
+    required this.stars,
+    required this.phases,
+    required this.animation,
+  }) : super(repaint: animation);
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
+    final t = animation.value * pi * 2;
     for (int i = 0; i < stars.length; i++) {
-      final opacity = (brightness[i] * 0.75).clamp(0.0, 1.0);
-      paint.color = Colors.white.withValues(alpha: opacity);
+      final b = (sin(phases[i] + t) + 1) / 2;
+      paint.color = Colors.white.withValues(alpha: (b * 0.75).clamp(0.0, 1.0));
       canvas.drawCircle(
         Offset(stars[i].dx * size.width, stars[i].dy * size.height),
-        brightness[i] * 1.5 + 0.3,
+        b * 1.5 + 0.3,
         paint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(_StarPainter old) => true;
+  bool shouldRepaint(_StarPainter old) => false;
 }
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
@@ -53,39 +71,28 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passFocus = FocusNode();
   bool _loading = false;
   bool _obscure = true;
   String? _error;
 
-  // ── Star field state ──────────────────────────────────────────────────────
   final List<Offset> _stars = [];
-  final List<double> _starBrightness = [];
   final List<double> _starPhase = [];
   final Random _rng = Random();
-  late AnimationController _starController;
+  late final AnimationController _starController;
 
   @override
   void initState() {
     super.initState();
-
     for (int i = 0; i < 60; i++) {
       _stars.add(Offset(_rng.nextDouble(), _rng.nextDouble()));
-      _starBrightness.add(_rng.nextDouble());
       _starPhase.add(_rng.nextDouble() * pi * 2);
     }
-
     _starController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 5),
     )..repeat();
-
-    _starController.addListener(() {
-      for (int i = 0; i < _stars.length; i++) {
-        _starPhase[i] += 0.020;
-        _starBrightness[i] = (sin(_starPhase[i]) + 1) / 2;
-      }
-      if (mounted) setState(() {});
-    });
   }
 
   @override
@@ -93,18 +100,32 @@ class _LoginScreenState extends State<LoginScreen>
     _starController.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _emailFocus.dispose();
+    _passFocus.dispose();
     super.dispose();
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   Future<void> _login() async {
+    if (_loading) return;
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text;
+
+    if (email.isEmpty || pass.isEmpty) {
+      setState(() => _error = 'Please enter your email and password');
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
       _error = null;
     });
+
     try {
-      final user = await AuthService.login(_emailCtrl.text, _passCtrl.text);
+      final user = await AuthService.login(email, pass);
       if (!mounted) return;
+      TextInput.finishAutofillContext(); // lets iOS offer "Save Password"
       setState(() => _loading = false);
       Navigator.pushReplacement(
         context,
@@ -117,6 +138,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = e.toString().replaceAll('Exception: ', '');
@@ -129,78 +151,97 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     final isDesktop = Responsive.isDesktop(context);
 
-    return Scaffold(
-      backgroundColor: _bg,
-      body: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
-    );
-  }
+    // Clamp Dynamic Type so large accessibility fonts don't break fixed heights
+    final mq = MediaQuery.of(context);
+    final scaler = mq.textScaler.clamp(maxScaleFactor: 1.3);
 
-  // ── Mobile layout ─────────────────────────────────────────────────────────
-  Widget _buildMobileLayout() {
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
-            child: ContentCap(maxWidth: 480, child: _buildFormContent()),
+    return MediaQuery(
+      data: mq.copyWith(textScaler: scaler),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light, // header is dark → white status icons
+        child: Scaffold(
+          backgroundColor: _bg,
+          resizeToAvoidBottomInset: true,
+          body: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
           ),
         ),
-      ],
+      ),
     );
   }
 
-  // ── Desktop layout (centered card) ────────────────────────────────────────
-  Widget _buildDesktopLayout() {
-    final topPad = MediaQuery.of(context).padding.top;
+  // ── Mobile layout: whole page scrolls, header shrinks with keyboard ──────
+  Widget _buildMobileLayout() {
+    final pad = MediaQuery.paddingOf(context);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: Column(
+        children: [
+          _buildHeader(compact: keyboardOpen),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              20 + pad.left,
+              24,
+              20 + pad.right,
+              32 + pad.bottom,
+            ),
+            child: ContentCap(maxWidth: 480, child: _buildFormContent()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Desktop layout ────────────────────────────────────────────────────────
+  Widget _buildDesktopLayout() {
     return Stack(
       children: [
         Positioned.fill(
           child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color.fromARGB(255, 8, 27, 66),
-                  Color.fromARGB(255, 190, 205, 228),
-                  Color.fromARGB(255, 8, 27, 66),
-                ],
-                stops: [0.0, 0.5, 1.0],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: CustomPaint(
-              painter: _StarPainter(stars: _stars, brightness: _starBrightness),
+            decoration: const BoxDecoration(gradient: _headerGradient),
+            child: RepaintBoundary(
+              child: CustomPaint(painter: _stars_painter()),
             ),
           ),
         ),
-        Center(
-          child: ContentCap(
-            maxWidth: 480,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(0, topPad + 32, 0, 32),
-              child: Column(
-                children: [
-                  Image.asset('assets/gto.png', width: 120, height: 120),
-                  const SizedBox(height: 24),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+        SafeArea(
+          child: Center(
+            child: ContentCap(
+              maxWidth: 480,
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('assets/gto.png', width: 120, height: 120),
+                    const SizedBox(height: 24),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(32),
+                      child: _buildFormContent(),
                     ),
-                    padding: const EdgeInsets.all(32),
-                    child: _buildFormContent(),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -209,49 +250,59 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  CustomPainter _stars_painter() => _StarPainter(
+    stars: _stars,
+    phases: _starPhase,
+    animation: _starController,
+  );
+
   // ── Shared form content ───────────────────────────────────────────────────
   Widget _buildFormContent() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeading(),
-        const SizedBox(height: 20),
-        _buildForm(),
-        if (_error != null) ...[const SizedBox(height: 12), _buildError()],
-        const SizedBox(height: 20),
-        _buildSignInButton(),
-      ],
+    return AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeading(),
+          const SizedBox(height: 20),
+          _buildForm(),
+          if (_error != null) ...[const SizedBox(height: 12), _buildError()],
+          const SizedBox(height: 20),
+          _buildSignInButton(),
+        ],
+      ),
     );
   }
 
   // ── Header (mobile only) ──────────────────────────────────────────────────
-  Widget _buildHeader() {
-    final topPad = MediaQuery.of(context).padding.top;
+  Widget _buildHeader({required bool compact}) {
+    final topPad = MediaQuery.paddingOf(context).top;
+    final screenH = MediaQuery.sizeOf(context).height;
+    final logo = compact ? 88.0 : min(200.0, screenH * 0.22);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color.fromARGB(255, 8, 27, 66),
-            Color.fromARGB(255, 190, 205, 228),
-            Color.fromARGB(255, 8, 27, 66),
-          ],
-          stops: [0.0, 0.5, 1.0],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+      decoration: const BoxDecoration(gradient: _headerGradient),
+      padding: EdgeInsets.only(
+        top: topPad + (compact ? 8 : 28),
+        bottom: compact ? 12 : 32,
       ),
-      padding: EdgeInsets.only(top: topPad + 28, bottom: 32),
       child: Stack(
         alignment: Alignment.center,
         children: [
           Positioned.fill(
-            child: CustomPaint(
-              painter: _StarPainter(stars: _stars, brightness: _starBrightness),
+            child: RepaintBoundary(
+              child: CustomPaint(painter: _stars_painter()),
             ),
           ),
-          Image.asset('assets/gto.png', width: 200, height: 200),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            width: logo,
+            height: logo,
+            child: Image.asset('assets/gto.png', fit: BoxFit.contain),
+          ),
         ],
       ),
     );
@@ -265,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen>
         Text(
           'Sign in',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: FontWeight.w700,
             color: _navy,
           ),
@@ -273,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen>
         const SizedBox(height: 2),
         Text(
           'Enter your credentials to continue',
-          style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted),
+          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
         ),
       ],
     );
@@ -286,37 +337,63 @@ class _LoginScreenState extends State<LoginScreen>
         _GTOField(
           label: 'EMAIL',
           controller: _emailCtrl,
+          focusNode: _emailFocus,
           hint: 'you@gto.com',
           icon: Icons.mail_outline_rounded,
           keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email, AutofillHints.username],
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _passFocus.requestFocus(),
+          autocorrect: false,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _GTOField(
           label: 'PASSWORD',
           controller: _passCtrl,
+          focusNode: _passFocus,
           hint: '••••••••',
           icon: Icons.lock_outline_rounded,
           obscure: _obscure,
+          autofillHints: const [AutofillHints.password],
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _login(),
+          autocorrect: false,
           suffix: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _obscure = !_obscure),
-            child: Icon(
-              _obscure
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 18,
-              color: _iconGray,
+            child: SizedBox(
+              width: 44,
+              height: 48,
+              child: Icon(
+                _obscure
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                size: 20,
+                color: _iconGray,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
-          child: Text(
-            'Forgot password?',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: _blue,
+          child: TextButton(
+            onPressed: () {
+              // TODO: navigate to forgot-password flow
+            },
+            style: TextButton.styleFrom(
+              minimumSize: const Size(44, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              tapTargetSize: MaterialTapTargetSize.padded,
+              foregroundColor: _blue,
+            ),
+            child: Text(
+              'Forgot password?',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _blue,
+              ),
             ),
           ),
         ),
@@ -327,21 +404,25 @@ class _LoginScreenState extends State<LoginScreen>
   // ── Error banner ──────────────────────────────────────────────────────────
   Widget _buildError() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFCEBEB),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFF09595)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, size: 14, color: Color(0xFFA32D2D)),
-          const SizedBox(width: 6),
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.error_outline, size: 16, color: Color(0xFFA32D2D)),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               _error!,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
+                fontSize: 13,
                 color: const Color(0xFFA32D2D),
               ),
             ),
@@ -355,34 +436,35 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildSignInButton() {
     return SizedBox(
       width: double.infinity,
-      height: 46,
+      height: 50,
       child: ElevatedButton(
         onPressed: _loading ? null : _login,
         style: ElevatedButton.styleFrom(
           backgroundColor: _navy,
+          disabledBackgroundColor: _navy.withValues(alpha: 0.7),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
         child: _loading
             ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.white,
+          ),
+        )
             : Text(
-                'Sign In',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
-              ),
+          'Sign In',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.3,
+          ),
+        ),
       ),
     );
   }
@@ -392,10 +474,15 @@ class _LoginScreenState extends State<LoginScreen>
 class _GTOField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final String hint;
   final IconData icon;
   final bool obscure;
   final TextInputType? keyboardType;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final bool autocorrect;
   final Widget? suffix;
 
   const _GTOField({
@@ -403,8 +490,13 @@ class _GTOField extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.icon,
+    this.focusNode,
     this.obscure = false,
     this.keyboardType,
+    this.autofillHints,
+    this.textInputAction,
+    this.onSubmitted,
+    this.autocorrect = false,
     this.suffix,
   });
 
@@ -416,47 +508,56 @@ class _GTOField extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.w700,
             color: const Color(0xFF3D5A6E),
             letterSpacing: 0.8,
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Container(
-          height: 44,
+          height: 48,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFD6E0E8), width: 1.5),
           ),
           child: Row(
             children: [
               const SizedBox(width: 12),
-              Icon(icon, size: 16, color: const Color(0xFF8FA8BB)),
+              Icon(icon, size: 18, color: const Color(0xFF8FA8BB)),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   obscureText: obscure,
                   keyboardType: keyboardType,
+                  autofillHints: autofillHints,
+                  textInputAction: textInputAction,
+                  onSubmitted: onSubmitted,
+                  autocorrect: autocorrect,
+                  enableSuggestions: !obscure,
+                  textCapitalization: TextCapitalization.none,
+                  textAlignVertical: TextAlignVertical.center,
+                  // 16px prevents iOS Safari auto-zoom on focus
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
+                    fontSize: 16,
                     color: const Color(0xFF0C2640),
                   ),
                   decoration: InputDecoration(
                     hintText: hint,
                     hintStyle: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
+                      fontSize: 16,
                       color: const Color(0xFFA8BFCC),
                     ),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: EdgeInsets.zero,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
-              if (suffix != null) ...[suffix!, const SizedBox(width: 8)],
+              suffix ?? const SizedBox(width: 12),
             ],
           ),
         ),

@@ -33,7 +33,7 @@ export const checkIn = async (userId, locationData = null) => {
       timeZone: "Asia/Kolkata",
       hour: "numeric",
       minute: "numeric",
-      hour12: false,
+      hourCycle: "h23",
     });
     const parts = istFormatter.formatToParts(checkinTime);
     const h = parts.find((p) => p.type === "hour")?.value;

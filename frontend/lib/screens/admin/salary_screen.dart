@@ -61,7 +61,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
     try {
       final salary = _salaries[index];
       await SalaryService.markPaid(salary['id']);
-      setState(() => _salaries[index]['status'] = 'paid');
+      await _loadData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

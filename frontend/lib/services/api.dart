@@ -72,11 +72,25 @@ class Api {
   }
 
   static Map<String, dynamic> _handle(http.Response res) {
-    final data = jsonDecode(res.body);
+    Map<String, dynamic> data;
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) {
+        data = decoded;
+      } else {
+        data = {'data': decoded};
+      }
+    } catch (_) {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return {};
+      }
+      throw Exception('Server error (${res.statusCode}): ${res.reasonPhrase ?? "Unexpected error"}');
+    }
+
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return data;
     }
-    throw Exception(data['error'] ?? 'Something went wrong');
+    throw Exception(data['error'] ?? 'Something went wrong (${res.statusCode})');
   }
 
   static Future<Map<String, dynamic>> uploadFile(

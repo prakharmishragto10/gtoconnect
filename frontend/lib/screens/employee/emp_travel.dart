@@ -84,6 +84,17 @@ class _EmpTravelState extends State<EmpTravel> {
       ),
     );
     if (picked == null) return;
+    if (!isStart && _startDate != null && picked.isBefore(_startDate!)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('End date cannot be before start date'),
+            backgroundColor: kDanger,
+          ),
+        );
+      }
+      return;
+    }
     setState(() {
       if (isStart) {
         _startDate = picked;
@@ -105,6 +116,16 @@ class _EmpTravelState extends State<EmpTravel> {
         _endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields'), backgroundColor: kDanger),
+      );
+      return;
+    }
+
+    if (_endDate!.isBefore(_startDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('End date cannot be before start date'),
+          backgroundColor: kDanger,
+        ),
       );
       return;
     }

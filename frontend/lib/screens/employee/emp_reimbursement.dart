@@ -70,7 +70,8 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
     try {
       final bytes = await picked.readAsBytes();
       final fileName = picked.name;
-      final mime = 'image/${fileName.split('.').last}';
+      final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpeg';
+      final mime = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
 
       final result = await Api.uploadFile('/api/upload', bytes, fileName, mime);
 
@@ -88,8 +89,13 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
   }
 
   Future<void> _submitClaim() async {
+    final parsedAmount = double.tryParse(_amountCtrl.text.trim());
     if (_amountCtrl.text.isEmpty || _descCtrl.text.isEmpty) {
       _showSnack('Please fill all fields', kDanger);
+      return;
+    }
+    if (parsedAmount == null || parsedAmount <= 0) {
+      _showSnack('Please enter a valid claim amount', kDanger);
       return;
     }
     if (_receiptUrl == null) {
@@ -102,7 +108,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
     try {
       final claim = await ReimbursementService.submitClaim(
         category: _selectedCategory,
-        amount: double.tryParse(_amountCtrl.text) ?? 0,
+        amount: parsedAmount,
         description: _descCtrl.text,
         receiptUrl: _receiptUrl!,
       );
