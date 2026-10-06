@@ -1,62 +1,121 @@
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../core/responsive.dart';
 import '../services/auth_service.dart';
 import 'admin/admin_home.dart';
 import 'employee/employee_home.dart';
 import 'subadmin/subadmin_home.dart';
 
 // ─── COLORS ───────────────────────────────────────────────────────────────────
-const _navy = Color(0xFF0C2640);
-const _blue = Color(0xFF185FA5);
-const _muted = Color(0xFF6B7E8F);
-const _iconGray = Color(0xFF8FA8BB);
-const _bg = Color(0xFFF0F4F8);
-const _card = Color(0xFFFFFFFF);
-const _border = Color(0xFFD6E0E8);
+const _ink = Color(0xFF1F1F1F);
+const _muted = Color(0xFF5F6B76);
+const _hint = Color(0xFF8C97A1);
+const _fieldBorder = Color(0xFF4A545C);
 
-const _headerGradient = LinearGradient(
-  colors: [
-    Color.fromARGB(255, 8, 27, 66),
-    Color.fromARGB(255, 190, 205, 228),
-    Color.fromARGB(255, 8, 27, 66),
-  ],
-  stops: [0.0, 0.5, 1.0],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
+// ─── SKY BACKGROUND ──────────────────────────────────────────────────────────
+// Painted rather than loaded from an image so the login screen works offline
+// and adds nothing to the app size.
+class _SkyPainter extends CustomPainter {
+  // (x, y, radius) as fractions of the canvas width/height/width
+  final List<(double, double, double)> _puffs = [];
+  final List<(double, double, double)> _wisps = [];
 
-// ─── STAR PAINTER (repaints via animation, no setState) ──────────────────────
-class _StarPainter extends CustomPainter {
-  final List<Offset> stars;
-  final List<double> phases;
-  final Animation<double> animation;
-
-  _StarPainter({
-    required this.stars,
-    required this.phases,
-    required this.animation,
-  }) : super(repaint: animation);
+  _SkyPainter() {
+    final rng = Random(11); // fixed seed: same sky on every launch
+    // Cumulus bank filling the lower half, denser towards the bottom
+    for (int i = 0; i < 90; i++) {
+      final y = 0.50 + pow(rng.nextDouble(), 0.8) * 0.55;
+      _puffs.add((
+        rng.nextDouble() * 1.2 - 0.1,
+        y,
+        0.035 + rng.nextDouble() * 0.06 + (y - 0.5) * 0.06,
+      ));
+    }
+    _puffs.sort((a, b) => a.$2.compareTo(b.$2));
+    // Thin high cloud streaks
+    for (int i = 0; i < 7; i++) {
+      _wisps.add((
+        rng.nextDouble(),
+        0.08 + rng.nextDouble() * 0.30,
+        0.10 + rng.nextDouble() * 0.16,
+      ));
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-    final t = animation.value * pi * 2;
-    for (int i = 0; i < stars.length; i++) {
-      final b = (sin(phases[i] + t) + 1) / 2;
-      paint.color = Colors.white.withValues(alpha: (b * 0.75).clamp(0.0, 1.0));
+    final rect = Offset.zero & size;
+    final w = size.width;
+    final h = size.height;
+    // Size clouds from the longer side so phones don't get tiny puffs
+    final unit = max(w, h * 0.9);
+
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF5E9FDD),
+            Color(0xFF8DBCE8),
+            Color(0xFFC9DDF0),
+            Color(0xFFE9EEF3),
+          ],
+          stops: [0.0, 0.35, 0.65, 1.0],
+        ).createShader(rect),
+    );
+
+    // High streaks
+    final wisp = Paint()
+      ..color = Colors.white.withValues(alpha: 0.28)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, unit * 0.02);
+    for (final (x, y, r) in _wisps) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(x * w, y * h),
+          width: r * unit * 2.6,
+          height: r * unit * 0.16,
+        ),
+        wisp,
+      );
+    }
+
+    // Faint concentric arcs rising from below the screen
+    final arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Colors.white.withValues(alpha: 0.30);
+    final arcCenter = Offset(w / 2, h * 1.15);
+    for (final k in [0.62, 0.78, 0.94]) {
+      canvas.drawCircle(arcCenter, max(w, h) * k, arc);
+    }
+
+    // Cumulus: a blue-grey underside first, then the lit white top
+    final shade = Paint()
+      ..color = const Color(0xFF9FB6CC).withValues(alpha: 0.30)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, unit * 0.022);
+    final lit = Paint()..color = Colors.white.withValues(alpha: 0.86);
+    final warm = Paint()..color = const Color(0xFFFBF3E8).withValues(alpha: 0.5);
+
+    for (final (x, y, r) in _puffs) {
+      final c = Offset(x * w, y * h);
+      final radius = r * unit;
+      final blur = MaskFilter.blur(BlurStyle.normal, radius * 0.32);
+      canvas.drawCircle(c + Offset(0, radius * 0.45), radius, shade);
+      canvas.drawCircle(c, radius, lit..maskFilter = blur);
       canvas.drawCircle(
-        Offset(stars[i].dx * size.width, stars[i].dy * size.height),
-        b * 1.5 + 0.3,
-        paint,
+        c + Offset(radius * 0.2, radius * 0.25),
+        radius * 0.7,
+        warm..maskFilter = blur,
       );
     }
   }
 
   @override
-  bool shouldRepaint(_StarPainter old) => false;
+  bool shouldRepaint(_SkyPainter old) => false;
 }
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
@@ -67,37 +126,18 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _emailFocus = FocusNode();
   final _passFocus = FocusNode();
+  final _sky = _SkyPainter();
   bool _loading = false;
   bool _obscure = true;
   String? _error;
 
-  final List<Offset> _stars = [];
-  final List<double> _starPhase = [];
-  final Random _rng = Random();
-  late final AnimationController _starController;
-
-  @override
-  void initState() {
-    super.initState();
-    for (int i = 0; i < 60; i++) {
-      _stars.add(Offset(_rng.nextDouble(), _rng.nextDouble()));
-      _starPhase.add(_rng.nextDouble() * pi * 2);
-    }
-    _starController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 5),
-    )..repeat();
-  }
-
   @override
   void dispose() {
-    _starController.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _emailFocus.dispose();
@@ -149,356 +189,278 @@ class _LoginScreenState extends State<LoginScreen>
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isDesktop = Responsive.isDesktop(context);
-
-    // Clamp Dynamic Type so large accessibility fonts don't break fixed heights
+    // Clamp Dynamic Type so large accessibility fonts don't break the card
     final mq = MediaQuery.of(context);
     final scaler = mq.textScaler.clamp(maxScaleFactor: 1.3);
 
     return MediaQuery(
       data: mq.copyWith(textScaler: scaler),
       child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.light, // header is dark → white status icons
+        value: SystemUiOverlayStyle.dark,
         child: Scaffold(
-          backgroundColor: _bg,
           resizeToAvoidBottomInset: true,
           body: GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             behavior: HitTestBehavior.opaque,
-            child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: RepaintBoundary(child: CustomPaint(painter: _sky)),
+                ),
+                SafeArea(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 24,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 440),
+                        child: _buildGlassCard(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ── Mobile layout: whole page scrolls, header shrinks with keyboard ──────
-  Widget _buildMobileLayout() {
-    final pad = MediaQuery.paddingOf(context);
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      child: Column(
-        children: [
-          _buildHeader(compact: keyboardOpen),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              20 + pad.left,
-              24,
-              20 + pad.right,
-              32 + pad.bottom,
-            ),
-            child: ContentCap(maxWidth: 480, child: _buildFormContent()),
+  // ── Frosted card ──────────────────────────────────────────────────────────
+  Widget _buildGlassCard() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(36),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1B3A5C).withValues(alpha: 0.18),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
-    );
-  }
-
-  // ── Desktop layout ────────────────────────────────────────────────────────
-  Widget _buildDesktopLayout() {
-    return Stack(
-      children: [
-        Positioned.fill(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(36),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            decoration: const BoxDecoration(gradient: _headerGradient),
-            child: RepaintBoundary(
-              child: CustomPaint(painter: _stars_painter()),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white.withValues(alpha: 0.55),
+                  Colors.white.withValues(alpha: 0.40),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(36),
+              border: Border.all(color: Colors.white, width: 6),
             ),
-          ),
-        ),
-        SafeArea(
-          child: Center(
-            child: ContentCap(
-              maxWidth: 480,
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset('assets/gto.png', width: 120, height: 120),
-                    const SizedBox(height: 24),
-                    Container(
+            padding: const EdgeInsets.fromLTRB(32, 40, 32, 44),
+            child: AutofillGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _card,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: _border),
+                        color: const Color(0xFFF7F3EA),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.all(32),
-                      child: _buildFormContent(),
+                      child: Image.asset('assets/gto.png', fit: BoxFit.contain),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Welcome back',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: _ink,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Please enter your details to sign in.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      color: _muted,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  _GlassField(
+                    label: 'E-Mail Address',
+                    controller: _emailCtrl,
+                    focusNode: _emailFocus,
+                    hint: 'Enter your email...',
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [
+                      AutofillHints.email,
+                      AutofillHints.username,
+                    ],
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) => _passFocus.requestFocus(),
+                  ),
+                  const SizedBox(height: 22),
+                  _GlassField(
+                    label: 'Password',
+                    controller: _passCtrl,
+                    focusNode: _passFocus,
+                    hint: 'Enter your password',
+                    obscure: _obscure,
+                    autofillHints: const [AutofillHints.password],
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _login(),
+                    suffix: IconButton(
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                      tooltip: _obscure ? 'Show password' : 'Hide password',
+                      icon: Icon(
+                        _obscure
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        size: 20,
+                        color: _fieldBorder,
+                      ),
+                    ),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 14),
+                    _buildError(),
                   ],
-                ),
+                  const SizedBox(height: 26),
+                  _buildSignInButton(),
+                ],
               ),
             ),
           ),
         ),
-      ],
-    );
-  }
-
-  CustomPainter _stars_painter() => _StarPainter(
-    stars: _stars,
-    phases: _starPhase,
-    animation: _starController,
-  );
-
-  // ── Shared form content ───────────────────────────────────────────────────
-  Widget _buildFormContent() {
-    return AutofillGroup(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeading(),
-          const SizedBox(height: 20),
-          _buildForm(),
-          if (_error != null) ...[const SizedBox(height: 12), _buildError()],
-          const SizedBox(height: 20),
-          _buildSignInButton(),
-        ],
       ),
-    );
-  }
-
-  // ── Header (mobile only) ──────────────────────────────────────────────────
-  Widget _buildHeader({required bool compact}) {
-    final topPad = MediaQuery.paddingOf(context).top;
-    final screenH = MediaQuery.sizeOf(context).height;
-    final logo = compact ? 88.0 : min(200.0, screenH * 0.22);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-      width: double.infinity,
-      decoration: const BoxDecoration(gradient: _headerGradient),
-      padding: EdgeInsets.only(
-        top: topPad + (compact ? 8 : 28),
-        bottom: compact ? 12 : 32,
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned.fill(
-            child: RepaintBoundary(
-              child: CustomPaint(painter: _stars_painter()),
-            ),
-          ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            width: logo,
-            height: logo,
-            child: Image.asset('assets/gto.png', fit: BoxFit.contain),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Heading ───────────────────────────────────────────────────────────────
-  Widget _buildHeading() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Sign in',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: _navy,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'Enter your credentials to continue',
-          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
-        ),
-      ],
-    );
-  }
-
-  // ── Form ──────────────────────────────────────────────────────────────────
-  Widget _buildForm() {
-    return Column(
-      children: [
-        _GTOField(
-          label: 'EMAIL',
-          controller: _emailCtrl,
-          focusNode: _emailFocus,
-          hint: 'you@gto.com',
-          icon: Icons.mail_outline_rounded,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email, AutofillHints.username],
-          textInputAction: TextInputAction.next,
-          onSubmitted: (_) => _passFocus.requestFocus(),
-          autocorrect: false,
-        ),
-        const SizedBox(height: 14),
-        _GTOField(
-          label: 'PASSWORD',
-          controller: _passCtrl,
-          focusNode: _passFocus,
-          hint: '••••••••',
-          icon: Icons.lock_outline_rounded,
-          obscure: _obscure,
-          autofillHints: const [AutofillHints.password],
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _login(),
-          autocorrect: false,
-          suffix: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _obscure = !_obscure),
-            child: SizedBox(
-              width: 44,
-              height: 48,
-              child: Icon(
-                _obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                size: 20,
-                color: _iconGray,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () {
-              // TODO: navigate to forgot-password flow
-            },
-            style: TextButton.styleFrom(
-              minimumSize: const Size(44, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              tapTargetSize: MaterialTapTargetSize.padded,
-              foregroundColor: _blue,
-            ),
-            child: Text(
-              'Forgot password?',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: _blue,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
   // ── Error banner ──────────────────────────────────────────────────────────
   Widget _buildError() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFCEBEB),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFF09595)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
-            child: Icon(Icons.error_outline, size: 16, color: Color(0xFFA32D2D)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _error!,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                color: const Color(0xFFA32D2D),
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFCEBEB).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF09595)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.error_outline,
+                size: 16,
+                color: Color(0xFFA32D2D),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _error!,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: const Color(0xFFA32D2D),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ── Sign-in button ────────────────────────────────────────────────────────
+  // ── Sign in button ────────────────────────────────────────────────────────
   Widget _buildSignInButton() {
     return SizedBox(
-      width: double.infinity,
-      height: 50,
+      height: 52,
       child: ElevatedButton(
         onPressed: _loading ? null : _login,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _navy,
-          disabledBackgroundColor: _navy.withValues(alpha: 0.7),
+          backgroundColor: _ink,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: _ink.withValues(alpha: 0.7),
+          disabledForegroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         child: _loading
             ? const SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Colors.white,
-          ),
-        )
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
             : Text(
-          'Sign In',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-          ),
-        ),
+                'Sign in',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
       ),
     );
   }
 }
 
-// ─── FIELD WIDGET ─────────────────────────────────────────────────────────────
-class _GTOField extends StatelessWidget {
-  final String label;
+// ─── FIELD ────────────────────────────────────────────────────────────────────
+class _GlassField extends StatelessWidget {
+  final String label, hint;
   final TextEditingController controller;
-  final FocusNode? focusNode;
-  final String hint;
-  final IconData icon;
+  final FocusNode focusNode;
   final bool obscure;
   final TextInputType? keyboardType;
   final Iterable<String>? autofillHints;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
-  final bool autocorrect;
   final Widget? suffix;
 
-  const _GTOField({
+  const _GlassField({
     required this.label,
-    required this.controller,
     required this.hint,
-    required this.icon,
-    this.focusNode,
+    required this.controller,
+    required this.focusNode,
     this.obscure = false,
     this.keyboardType,
     this.autofillHints,
     this.textInputAction,
     this.onSubmitted,
-    this.autocorrect = false,
     this.suffix,
   });
+
+  OutlineInputBorder _border(Color color, double width) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(16),
+    borderSide: BorderSide(color: color, width: width),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -508,57 +470,41 @@ class _GTOField extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 11,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF3D5A6E),
-            letterSpacing: 0.8,
+            color: _ink,
           ),
         ),
-        const SizedBox(height: 6),
-        Container(
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFD6E0E8), width: 1.5),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          focusNode: focusNode,
+          obscureText: obscure,
+          keyboardType: keyboardType,
+          autofillHints: autofillHints,
+          textInputAction: textInputAction,
+          onSubmitted: onSubmitted,
+          autocorrect: false,
+          enableSuggestions: !obscure,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: _ink,
           ),
-          child: Row(
-            children: [
-              const SizedBox(width: 12),
-              Icon(icon, size: 18, color: const Color(0xFF8FA8BB)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  obscureText: obscure,
-                  keyboardType: keyboardType,
-                  autofillHints: autofillHints,
-                  textInputAction: textInputAction,
-                  onSubmitted: onSubmitted,
-                  autocorrect: autocorrect,
-                  enableSuggestions: !obscure,
-                  textCapitalization: TextCapitalization.none,
-                  textAlignVertical: TextAlignVertical.center,
-                  // 16px prevents iOS Safari auto-zoom on focus
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    color: const Color(0xFF0C2640),
-                  ),
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    hintStyle: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      color: const Color(0xFFA8BFCC),
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-              suffix ?? const SizedBox(width: 12),
-            ],
+          cursorColor: _ink,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.plusJakartaSans(fontSize: 15, color: _hint),
+            suffixIcon: suffix,
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.25),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 15,
+            ),
+            border: _border(_fieldBorder, 1.2),
+            enabledBorder: _border(_fieldBorder, 1.2),
+            focusedBorder: _border(_ink, 1.8),
           ),
         ),
       ],

@@ -8,13 +8,13 @@ import {
   removeEmployee,
   editEmployee,
 } from "../controllers/auth.controller.js";
-import auth, { adminOnly } from "../middleware/auth.js";
+import auth, { adminOnly, staffOnly } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.post("/login", login);
 router.get("/me", auth, me);
-router.get("/employees", auth, adminOnly, employees);
+router.get("/employees", auth, staffOnly, employees);
 
 router.patch("/updatepass", auth, adminOnly, updatePass);
 router.post("/signup", auth, adminOnly, signupEmployee);

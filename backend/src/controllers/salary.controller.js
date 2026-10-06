@@ -5,6 +5,8 @@ import {
   getAllSalaries,
   markSalaryPaid,
   getPayrollSummary,
+  uploadSalarySlip,
+  getSalarySlipUrl,
 } from "../services/salary.service.js";
 
 export const generate = async (req, res) => {
@@ -74,5 +76,30 @@ export const summary = async (req, res) => {
     res.json({ summary: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+export const uploadSlip = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file provided" });
+    }
+    const data = await uploadSalarySlip(
+      req.params.id,
+      req.file.buffer,
+      req.file.mimetype,
+    );
+    res.json({ message: "Salary slip uploaded", salary: data });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const slipUrl = async (req, res) => {
+  try {
+    const url = await getSalarySlipUrl(req.params.id, req.user);
+    res.json({ url });
+  } catch (err) {
+    res.status(404).json({ error: err.message });
   }
 };

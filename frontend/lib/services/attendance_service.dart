@@ -1,6 +1,17 @@
 import 'api.dart';
 
 class AttendanceService {
+  /// Time left until today's 6:30 PM IST automatic check-out, or null once it
+  /// has passed. The server does the check-out; screens use this to refresh.
+  static Duration? untilAutoCheckout() {
+    final ist = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    final cutoff = DateTime.utc(ist.year, ist.month, ist.day, 18, 30);
+    final left = cutoff.difference(ist);
+    return left.isNegative ? null : left;
+  }
+
   // ── Check In ──────────────────────────────────────────
   static Future<Map<String, dynamic>> checkIn({
     double? latitude,
@@ -41,6 +52,22 @@ class AttendanceService {
     final query = params.isNotEmpty ? '?${params.join('&')}' : '';
     final data = await Api.get('/api/attendance/my$query');
     return data['attendance'] ?? [];
+  }
+
+  // ── Month calendar: check-ins plus absent / weekly-off days ───────────
+  // Returns { days: [...], summary: {...}, joining_date }.
+  static Future<Map<String, dynamic>> getMyCalendar(int month, int year) {
+    return Api.get('/api/attendance/my/calendar?month=$month&year=$year');
+  }
+
+  static Future<Map<String, dynamic>> getEmployeeCalendar(
+    String userId,
+    int month,
+    int year,
+  ) {
+    return Api.get(
+      '/api/attendance/employee/$userId/calendar?month=$month&year=$year',
+    );
   }
 
   // ── All / Filtered by date, month, year (admin) ─────────

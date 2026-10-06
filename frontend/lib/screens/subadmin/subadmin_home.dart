@@ -3,19 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
 import '../../core/responsive.dart';
 import '../../models/user.dart';
-import '../../services/auth_service.dart';
 import '../../services/reimbursement_service.dart';
 import '../../services/salary_service.dart';
-import '../login_screen.dart';
+import '../../widgets/app_shell.dart';
+import '../../widgets/dashboard_widgets.dart';
 import '../admin/claims_screen.dart';
 import '../admin/salary_screen.dart';
 import '../admin/attendance_screen.dart';
 
-// ── Nav item definition ───────────────────────────────────────────────────────
-typedef _NavItem = ({IconData icon, IconData activeIcon, String label});
-
-const List<_NavItem> _navItems = [
-  (icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
+const List<ShellNavItem> _navItems = [
+  (icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Home'),
   (icon: Icons.receipt_outlined, activeIcon: Icons.receipt, label: 'Claims'),
   (icon: Icons.payments_outlined, activeIcon: Icons.payments, label: 'Salary'),
   (
@@ -35,242 +32,16 @@ class SubAdminHome extends StatefulWidget {
 }
 
 class _SubAdminHomeState extends State<SubAdminHome> {
-  int _currentIndex = 0;
-  late final List<Widget> _screens;
-
-  @override
-  void initState() {
-    super.initState();
-    _screens = [
-      SubAdminDashboard(user: widget.user),
-      const ClaimsScreen(),
-      const SalaryScreen(),
-      const AttendanceScreen(),
-    ];
-  }
-
-  void _logout() async {
-    await AuthService.logout();
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
-  }
+  late final List<Widget> _screens = [
+    SubAdminDashboard(user: widget.user),
+    const ClaimsScreen(),
+    const SalaryScreen(),
+    const AttendanceScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = Responsive.isDesktop(context);
-
-    return Scaffold(
-      backgroundColor: kOffWhite,
-      appBar: AppBar(
-        backgroundColor: kDeepBlue,
-        elevation: 0,
-        toolbarHeight: 52,
-        title: RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: 'GTO',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              TextSpan(
-                text: '.',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: kBlueGray,
-                ),
-              ),
-              TextSpan(
-                text: 'Connect',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          if (isDesktop) ...[
-            _AppBarAvatar(name: widget.user.name),
-            const SizedBox(width: 8),
-          ],
-          TextButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout, size: 16, color: kBlueGray),
-            label: Text(
-              'Sign out',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                color: kBlueGray,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: isDesktop
-          ? _SubAdminDesktopLayout(
-              currentIndex: _currentIndex,
-              onNav: (i) => setState(() => _currentIndex = i),
-              child: _screens[_currentIndex],
-            )
-          : _screens[_currentIndex],
-      bottomNavigationBar: isDesktop
-          ? null
-          : BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: (i) => setState(() => _currentIndex = i),
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: Colors.white,
-              selectedItemColor: kDeepBlue,
-              unselectedItemColor: kBlueGray,
-              selectedLabelStyle: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-              unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontSize: 11),
-              items: _navItems
-                  .map(
-                    (n) => BottomNavigationBarItem(
-                      icon: Icon(n.icon),
-                      activeIcon: Icon(n.activeIcon),
-                      label: n.label,
-                    ),
-                  )
-                  .toList(),
-            ),
-    );
-  }
-}
-
-// ── Desktop sidebar + content ─────────────────────────────────────────────────
-class _SubAdminDesktopLayout extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onNav;
-  final Widget child;
-
-  const _SubAdminDesktopLayout({
-    required this.currentIndex,
-    required this.onNav,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // ── Sidebar ──────────────────────────────────────────────────────────
-        Container(
-          width: 210,
-          color: kDeepBlue,
-          child: ListView(
-            padding: const EdgeInsets.only(top: 12),
-            children: List.generate(_navItems.length, (i) {
-              final item = _navItems[i];
-              final active = i == currentIndex;
-              return InkWell(
-                onTap: () => onNav(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  decoration: BoxDecoration(
-                    color: active
-                        ? Colors.white.withValues(alpha: 0.08)
-                        : Colors.transparent,
-                    border: Border(
-                      left: BorderSide(
-                        color: active ? Colors.blue : Colors.transparent,
-                        width: 3,
-                      ),
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 13,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        active ? item.activeIcon : item.icon,
-                        size: 18,
-                        color: active
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.45),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        item.label,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: active
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          color: active
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.45),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-
-        // ── Content area ─────────────────────────────────────────────────────
-        Expanded(child: child),
-      ],
-    );
-  }
-}
-
-// ── App bar avatar ────────────────────────────────────────────────────────────
-class _AppBarAvatar extends StatelessWidget {
-  final String name;
-  const _AppBarAvatar({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    final initials = name
-        .trim()
-        .split(' ')
-        .take(2)
-        .map((w) => w[0].toUpperCase())
-        .join();
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 14,
-          backgroundColor: Colors.white.withValues(alpha: 0.15),
-          child: Text(
-            initials,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          name,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-      ],
-    );
+    return AppShell(user: widget.user, items: _navItems, screens: _screens);
   }
 }
 
@@ -335,6 +106,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
         (s, c) => s + (c['amount'] as num).toDouble(),
       );
 
+      if (!mounted) return;
       setState(() {
         _pendingClaims = pending.length;
         _pendingTotal = pTotal;
@@ -348,7 +120,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -368,7 +140,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
           children: [
             _buildGreeting(isDesktop),
             const SizedBox(height: 20),
-            _SectionLabel('CLAIMS OVERVIEW'),
+            const DashSectionHeader('Claims overview'),
             const SizedBox(height: 10),
             _buildStatsGrid(isDesktop),
             const SizedBox(height: 24),
@@ -392,8 +164,8 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
         Text(
           widget.user.name,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
             color: Colors.white,
           ),
         ),
@@ -415,22 +187,16 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
     final quickStats = isDesktop
         ? Row(
             children: [
-              _GreetingStat(label: 'Pending Claims', value: '$_pendingClaims'),
-              const SizedBox(width: 24),
-              _GreetingStat(label: 'Approved', value: '$_approvedClaims'),
-              const SizedBox(width: 24),
-              _GreetingStat(label: 'Net Payable', value: _netPayable),
+              HeroStat(label: 'Pending Claims', value: '$_pendingClaims'),
+              const SizedBox(width: 10),
+              HeroStat(label: 'Approved', value: '$_approvedClaims'),
+              const SizedBox(width: 10),
+              HeroStat(label: 'Net Payable', value: _netPayable),
             ],
           )
         : null;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kDeepBlue,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return DashHero(
       child: isDesktop
           ? Row(
               children: [
@@ -456,7 +222,7 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
       (
         label: 'Approved',
         value: '$_approvedClaims',
-        sub: 'This month',
+        sub: 'Awaiting payment',
         icon: Icons.check_circle_outline,
         color: kForest,
         bg: kSuccessBg,
@@ -479,27 +245,17 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
       ),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isDesktop ? 4 : 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: isDesktop ? 1.6 : 1.5,
-      ),
-      itemCount: cards.length,
-      itemBuilder: (_, i) {
-        final c = cards[i];
-        return _StatCard(
+    return DashStatGrid(
+      maxColumns: 4,
+      withSub: true,
+      children: [for (final c in cards) DashStatCard(
           label: c.label,
           value: c.value,
           sub: c.sub,
           icon: c.icon,
           color: c.color,
           bg: c.bg,
-        );
-      },
+        )],
     );
   }
 
@@ -508,23 +264,13 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const _SectionLabel('RECENT CLAIMS'),
-            Text(
-              'See all',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                color: kDeepBlue,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+        const DashSectionHeader('Recent claims'),
         const SizedBox(height: 10),
         if (_recentClaims.isEmpty)
-          _EmptyState('No claims yet')
+          const DashEmptyState(
+            'No claims yet',
+            icon: Icons.receipt_long_outlined,
+          )
         else
           ..._recentClaims.map((c) {
             final submitter = c['submitter'] as Map<String, dynamic>?;
@@ -533,233 +279,23 @@ class _SubAdminDashboardState extends State<SubAdminDashboard> {
             final date = (c['created_at'] as String).substring(0, 10);
             final status = c['status'] as String;
 
-            Color sc = status == 'pending'
-                ? kWarn
-                : status == 'approved'
-                ? kForest
-                : status == 'paid'
-                ? kDeepBlue
-                : kDanger;
-            Color sb = status == 'pending'
-                ? kWarnBg
-                : status == 'approved'
-                ? kSuccessBg
-                : status == 'paid'
-                ? kInfoBg
-                : kDangerBg;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorder),
+            return DashListTile(
+              leading: InitialAvatar(name.toString()),
+              title: name.toString(),
+              subtitle: Text(
+                '${c['category']} · $date',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  color: kTealGray,
+                ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: kInfoBg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        name.substring(0, 1),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: kDeepBlue,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: kDeepBlue,
-                          ),
-                        ),
-                        Text(
-                          '${c['category']} · $date',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            color: kTealGray,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '₹${amount.toStringAsFixed(0)}',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: kDeepBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: sb,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          status,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: sc,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              trailingText: '₹${amount.toStringAsFixed(0)}',
+              status: status,
             );
           }),
       ],
-    );
-  }
-}
-
-// ── Greeting quick-stat chip (desktop only) ───────────────────────────────────
-class _GreetingStat extends StatelessWidget {
-  final String label, value;
-  const _GreetingStat({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 26,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(fontSize: 11, color: kBlueGray),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Shared: section label ─────────────────────────────────────────────────────
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: GoogleFonts.plusJakartaSans(
-      fontSize: 10,
-      fontWeight: FontWeight.w700,
-      color: kTealGray,
-      letterSpacing: 1.2,
-    ),
-  );
-}
-
-// ── Empty state ───────────────────────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  final String message;
-  const _EmptyState(this.message);
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Text(
-        message,
-        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
-      ),
-    ),
-  );
-}
-
-// ── Stat Card ─────────────────────────────────────────────────────────────────
-class _StatCard extends StatelessWidget {
-  final String label, value, sub;
-  final IconData icon;
-  final Color color, bg;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.sub,
-    required this.icon,
-    required this.color,
-    required this.bg,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Icon(icon, size: 16, color: color),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: kDeepBlue,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: kTealGray,
-            ),
-          ),
-          Text(
-            sub,
-            style: GoogleFonts.plusJakartaSans(fontSize: 10, color: kBlueGray),
-          ),
-        ],
-      ),
     );
   }
 }

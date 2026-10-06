@@ -192,21 +192,23 @@ class LocationService {
       throw Exception('Location permission permanently denied');
     }
 
-    // Send immediately
-    await _sendLocation();
-
-    // Then every 2 minutes
+    // Every 2 minutes, starting now. The first fix is not awaited: indoors it
+    // can take a long time and callers only need tracking to be switched on.
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(minutes: 2), (_) async {
       await _sendLocation();
     });
+    unawaited(_sendLocation());
   }
 
   static Future<void> _sendLocation() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 45),
       );
+      // Tracking may have been stopped (check-out, sign-out) while waiting
+      if (_timer == null) return;
       await updateLocation(pos.latitude, pos.longitude);
       getAddressFromCoords(pos.latitude, pos.longitude).then((name) {
         if (name != null) lastKnownLocationName = name;

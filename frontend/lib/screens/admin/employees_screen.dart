@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../core/colors.dart';
+import '../../core/responsive.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/app_shell.dart';
+import '../../widgets/dashboard_widgets.dart';
 import 'employee_detail_screen.dart';
 
 class EmployeesScreen extends StatefulWidget {
@@ -423,211 +427,365 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       return const Center(child: CircularProgressIndicator(color: kDeepBlue));
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final isDesktop = Responsive.isDesktop(context);
+
+    return ValueListenableBuilder<String>(
+      valueListenable: shellSearch,
+      builder: (context, query, _) {
+        final rows = _visibleEmployees(query);
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isDesktop ? 28 : 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Team',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: kDeepBlue,
+              // ── Toolbar: Sort · Filter · Add ─────────────────────────────
+              Row(
+                children: [
+                  PopupMenuButton<String>(
+                    tooltip: 'Sort',
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    onSelected: (v) => setState(() => _sortBy = v),
+                    itemBuilder: (_) => [
+                      for (final o in _sortOptions.entries)
+                        CheckedPopupMenuItem<String>(
+                          value: o.key,
+                          checked: _sortBy == o.key,
+                          child: Text(
+                            o.value,
+                            style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                          ),
+                        ),
+                    ],
+                    child: const ShellPill(icon: Icons.swap_vert, label: 'Sort'),
+                  ),
+                  const SizedBox(width: 10),
+                  PopupMenuButton<String>(
+                    tooltip: 'Filter by location',
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    onSelected: (v) => setState(
+                      () => _locationFilter = v == _allLocations ? null : v,
+                    ),
+                    itemBuilder: (_) => [
+                      for (final loc in [_allLocations, ..._locations])
+                        CheckedPopupMenuItem<String>(
+                          value: loc,
+                          checked: (_locationFilter ?? _allLocations) == loc,
+                          child: Text(
+                            loc,
+                            style: GoogleFonts.plusJakartaSans(fontSize: 13),
+                          ),
+                        ),
+                    ],
+                    child: ShellPill(
+                      icon: Icons.filter_alt_outlined,
+                      label: _locationFilter ?? 'Filter',
+                    ),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: _showAddEmployeeSheet,
+                    borderRadius: BorderRadius.circular(22),
+                    child: ShellPill(
+                      icon: Icons.person_add_alt_1_outlined,
+                      label: isDesktop ? 'Add Employee' : 'Add',
+                    ),
+                  ),
+                ],
+              ),
+              if (!isDesktop) ...[
+                const SizedBox(height: 12),
+                const ShellSearchField(fill: Color(0xFFF4F8FA)),
+              ],
+              const SizedBox(height: 16),
+
+              // ── Table ────────────────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F8FA),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  children: [
+                    _TeamHeaderRow(isDesktop: isDesktop),
+                    const Divider(height: 1, color: Color(0xFFDCE7EE)),
+                    const SizedBox(height: 6),
+                    if (rows.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          _employees.isEmpty
+                              ? 'No employees yet'
+                              : 'No employees match your search',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: kTealGray,
+                          ),
+                        ),
+                      )
+                    else
+                      for (var i = 0; i < rows.length; i++)
+                        _TeamRow(
+                          emp: rows[i],
+                          striped: i.isOdd,
+                          isDesktop: isDesktop,
+                          onTap: () => _openEmployee(rows[i]),
+                        ),
+                  ],
                 ),
               ),
-              InkWell(
-                onTap: _showAddEmployeeSheet,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kDeepBlue,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.add, size: 14, color: Colors.white),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Add Employee',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
+              const SizedBox(height: 10),
+              Text(
+                '${rows.length} of ${_employees.length} team members',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: kTealGray,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${_employees.length} team members',
-            style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
-          ),
-          const SizedBox(height: 16),
+        );
+      },
+    );
+  }
 
-          if (_employees.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  'No employees found',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    color: kTealGray,
-                  ),
-                ),
-              ),
-            )
-          else
-            ..._employees.map(
-              (e) => _EmployeeCard(
-                emp: e,
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EmployeeDetailScreen(
-                        emp: e as Map<String, dynamic>,
-                        onDeleted: _loadEmployees,
-                        onUpdated: _loadEmployees,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
+  // ── Sort / filter / search ─────────────────────────────────────────────────
+  static const _allLocations = 'All locations';
+  static const _sortOptions = {
+    'name': 'Name (A–Z)',
+    'designation': 'Designation',
+    'joining_date': 'Start date (newest)',
+    'base_salary': 'Salary (highest)',
+  };
+
+  String _sortBy = 'name';
+  String? _locationFilter;
+
+  List<String> get _locations {
+    final set = <String>{};
+    for (final e in _employees) {
+      final loc = (e['location'] ?? '').toString().trim();
+      if (loc.isNotEmpty) set.add(loc);
+    }
+    return set.toList()..sort();
+  }
+
+  List<Map<String, dynamic>> _visibleEmployees(String query) {
+    final q = query.trim().toLowerCase();
+    String text(Map e, String key) => (e[key] ?? '').toString();
+
+    final rows = _employees
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .where((e) {
+          if (_locationFilter != null &&
+              text(e, 'location').trim() != _locationFilter) {
+            return false;
+          }
+          if (q.isEmpty) return true;
+          return ['name', 'email', 'designation', 'location'].any(
+            (k) => text(e, k).toLowerCase().contains(q),
+          );
+        })
+        .toList();
+
+    rows.sort((a, b) {
+      switch (_sortBy) {
+        case 'base_salary':
+          final sa = (a['base_salary'] as num?) ?? -1;
+          final sb = (b['base_salary'] as num?) ?? -1;
+          return sb.compareTo(sa);
+        case 'joining_date':
+          return text(b, 'joining_date').compareTo(text(a, 'joining_date'));
+        default:
+          return text(a, _sortBy).toLowerCase().compareTo(
+            text(b, _sortBy).toLowerCase(),
+          );
+      }
+    });
+    return rows;
+  }
+
+  Future<void> _openEmployee(Map<String, dynamic> emp) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EmployeeDetailScreen(
+          emp: emp,
+          onDeleted: _loadEmployees,
+          onUpdated: _loadEmployees,
+        ),
       ),
     );
   }
 }
 
-class _EmployeeCard extends StatelessWidget {
+// Column widths shared by the header and the rows
+const _colName = 5;
+const _colDesignation = 4;
+const _colLocation = 4;
+const _colStart = 3;
+const _colSalary = 3;
+
+class _TeamHeaderRow extends StatelessWidget {
+  final bool isDesktop;
+  const _TeamHeaderRow({required this.isDesktop});
+
+  Widget _cell(String label, int flex, {bool end = false}) => Expanded(
+    flex: flex,
+    child: Text(
+      label,
+      textAlign: end ? TextAlign.end : TextAlign.start,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.4,
+        color: kShellBlue,
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    child: Row(
+      children: [
+        _cell('FULL NAME', isDesktop ? _colName : 6),
+        if (isDesktop) ...[
+          _cell('DESIGNATION', _colDesignation),
+          _cell('LOCATION', _colLocation),
+          _cell('START DATE', _colStart),
+        ],
+        _cell('SALARY', _colSalary, end: !isDesktop),
+      ],
+    ),
+  );
+}
+
+class _TeamRow extends StatelessWidget {
   final Map<String, dynamic> emp;
+  final bool striped, isDesktop;
   final VoidCallback onTap;
-  const _EmployeeCard({required this.emp, required this.onTap});
+
+  const _TeamRow({
+    required this.emp,
+    required this.striped,
+    required this.isDesktop,
+    required this.onTap,
+  });
+
+  String _orDash(dynamic v) {
+    final s = (v ?? '').toString().trim();
+    return s.isEmpty ? '—' : s;
+  }
+
+  String get _startDate {
+    final dt = DateTime.tryParse((emp['joining_date'] ?? '').toString());
+    return dt == null ? '—' : DateFormat('dd.MM.yyyy').format(dt);
+  }
+
+  String get _salary {
+    final s = emp['base_salary'];
+    if (s is! num) return '—';
+    return '₹${NumberFormat.decimalPattern('en_IN').format(s)}';
+  }
+
+  Widget _cell(String text, int flex, {bool end = false}) => Expanded(
+    flex: flex,
+    child: Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: end ? TextAlign.end : TextAlign.start,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: kShellBlueDark,
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final name = emp['name'] ?? '—';
-    final role = emp['designation'] ?? '—';
-    final loc = emp['location'] ?? '—';
-    final salary = emp['base_salary'];
+    final name = _orDash(emp['name']);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kBorder),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: kInfoBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  (name as String).isNotEmpty ? name.substring(0, 1).toUpperCase() : '?',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: kDeepBlue,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: kDeepBlue,
-                    ),
-                  ),
-                  Text(
-                    role.isNotEmpty ? role : '—',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      color: kTealGray,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 11,
-                        color: kBlueGray,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        loc.isNotEmpty ? loc : '—',
+    return Material(
+      color: striped ? const Color(0xFFD9E9F2) : Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                flex: isDesktop ? _colName : 6,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: kShellBlue,
+                      child: Text(
+                        initialsOf(name),
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          color: kBlueGray,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        size: 11,
-                        color: kBlueGray,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kShellBlueDark,
+                            ),
+                          ),
+                          // Phones have no designation column, so show it here
+                          if (!isDesktop)
+                            Text(
+                              _orDash(emp['designation']),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                color: kTealGray,
+                              ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(width: 2),
-                      Text(
-                        salary != null ? '₹${salary.toString()}' : '—',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: kDeepBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: kSuccessBg,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                'Active',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                  color: kForest,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                 ),
               ),
-            ),
-          ],
+              if (isDesktop) ...[
+                _cell(_orDash(emp['designation']), _colDesignation),
+                _cell(_orDash(emp['location']), _colLocation),
+                _cell(_startDate, _colStart),
+              ],
+              _cell(_salary, _colSalary, end: !isDesktop),
+            ],
+          ),
         ),
       ),
     );

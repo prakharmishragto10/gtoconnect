@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Uses the backend running on this machine (cd backend && npm start).
+      // Pick this to test backend changes before they are deployed.
+      "name": "GTO Connect (local backend)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "frontend",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "toolArgs": ["--dart-define=BASE_URL=http://localhost:3000"]
+    },
+    {
+      // Uses the deployed backend at gtoconnect.vercel.app
+      "name": "GTO Connect (live backend)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "frontend",
+      "program": "lib/main.dart",
+      "deviceId": "chrome"
+    }
+  ]
+}

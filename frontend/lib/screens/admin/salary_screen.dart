@@ -1,7 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
 import '../../services/salary_service.dart';
+import 'employee_history_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SalaryScreen extends StatefulWidget {
   const SalaryScreen({super.key});
@@ -14,6 +17,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
   bool _loading = true;
   List<dynamic> _salaries = [];
   Map<String, dynamic> _summary = {};
+  String? _loadError;
 
   late int _month;
   late int _year;
@@ -44,17 +48,47 @@ class _SalaryScreenState extends State<SalaryScreen> {
   }
 
   Future<void> _loadData() async {
+    final month = _month;
+    final year = _year;
     try {
-      final salaries = await SalaryService.getAllSalaries(_month, _year);
-      final summary = await SalaryService.getSummary(_month, _year);
+      final salaries = await SalaryService.getAllSalaries(month, year);
+      final summary = await SalaryService.getSummary(month, year);
+      // Ignore the answer if the admin moved to another month meanwhile
+      if (!mounted || month != _month || year != _year) return;
       setState(() {
         _salaries = salaries;
         _summary = summary;
+        _loadError = null;
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e.toString().replaceAll('Exception: ', '');
+      });
     }
+  }
+
+  void _changeMonth(int delta) {
+    var m = _month + delta;
+    var y = _year;
+    if (m < 1) {
+      m = 12;
+      y--;
+    } else if (m > 12) {
+      m = 1;
+      y++;
+    }
+    setState(() {
+      _month = m;
+      _year = y;
+      _salaries = [];
+      _summary = {};
+      _loadError = null;
+      _loading = true;
+    });
+    _loadData();
   }
 
   Future<void> _markPaid(int index) async {
@@ -85,14 +119,80 @@ class _SalaryScreenState extends State<SalaryScreen> {
     }
   }
 
+  void _snack(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  // Id of the salary record whose slip is being uploaded or opened
+  String? _slipBusyId;
+
+  static const _slipMimeTypes = {
+    'pdf': 'application/pdf',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+  };
+
+  Future<void> _uploadSlip(String salaryId) async {
+    final picked = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: _slipMimeTypes.keys.toList(),
+    );
+    if (picked.isEmpty || !mounted) return;
+    final file = picked.first;
+
+    final mime = _slipMimeTypes[(file.extension ?? '').toLowerCase()];
+    if (mime == null) {
+      _snack('Choose a PDF, JPG or PNG file', kDanger);
+      return;
+    }
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    if (bytes.length > 4 * 1024 * 1024) {
+      _snack('Salary slip must be under 4 MB', kDanger);
+      return;
+    }
+
+    setState(() => _slipBusyId = salaryId);
+    try {
+      await SalaryService.uploadSlip(salaryId, bytes, file.name, mime);
+      await _loadData();
+      _snack('Salary slip uploaded', kForest);
+    } catch (e) {
+      _snack(e.toString().replaceAll('Exception: ', ''), kDanger);
+    }
+    if (mounted) setState(() => _slipBusyId = null);
+  }
+
+  Future<void> _viewSlip(String salaryId) async {
+    try {
+      final url = await SalaryService.getSlipUrl(salaryId);
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) _snack('Could not open the salary slip', kDanger);
+    } catch (e) {
+      _snack(e.toString().replaceAll('Exception: ', ''), kDanger);
+    }
+  }
+
   Future<void> _generateSalary() async {
     setState(() => _loading = true);
     try {
       await SalaryService.generate(_month, _year);
       await _loadData();
     } catch (e) {
-      setState(() => _loading = false);
       if (!mounted) return;
+      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceAll('Exception: ', '')),
@@ -109,8 +209,14 @@ class _SalaryScreenState extends State<SalaryScreen> {
     }
 
     final monthLabel = '${_monthNames[_month]} $_year';
+    // Salaries are final, and payable, only once the month is over. The
+    // server enforces this and recalculates from the full month on payment.
+    final payableFrom = DateTime(_year, _month + 1, 1);
+    final monthOver = !DateTime.now().isBefore(payableFrom);
     final gross = (_summary['gross'] as num?)?.toDouble() ?? 0;
     final reimb = (_summary['reimbursements'] as num?)?.toDouble() ?? 0;
+    final deductions = (_summary['deductions'] as num?)?.toDouble() ?? 0;
+    final net = (_summary['net'] as num?)?.toDouble() ?? gross;
     final paid = (_summary['paid'] as num?)?.toInt() ?? 0;
     final pend = (_summary['pending'] as num?)?.toInt() ?? 0;
 
@@ -133,17 +239,48 @@ class _SalaryScreenState extends State<SalaryScreen> {
                       color: kDeepBlue,
                     ),
                   ),
-                  Text(
-                    monthLabel,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      color: kTealGray,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: () => _changeMonth(-1),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(
+                            Icons.chevron_left,
+                            size: 20,
+                            color: kDeepBlue,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        monthLabel,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kTealGray,
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _changeMonth(1),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(
+                            Icons.chevron_right,
+                            size: 20,
+                            color: kDeepBlue,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              if (_salaries.isEmpty)
-                GestureDetector(
+              // Shown for existing payroll too: it adds new employees and
+              // refreshes unpaid records, and never changes paid ones.
+              GestureDetector(
                   onTap: _generateSalary,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -155,7 +292,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Text(
-                      'Generate',
+                      _salaries.isEmpty ? 'Generate' : 'Refresh',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -181,15 +318,18 @@ class _SalaryScreenState extends State<SalaryScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'No salary records for $monthLabel',
+                      _loadError != null
+                          ? 'Could not load salaries'
+                          : 'No salary records for $monthLabel',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
-                        color: kTealGray,
+                        color: _loadError != null ? kDanger : kTealGray,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Tap Generate to create payroll',
+                      _loadError ?? 'Tap Generate to create payroll',
+                      textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11,
                         color: kBlueGray,
@@ -216,17 +356,23 @@ class _SalaryScreenState extends State<SalaryScreen> {
                     false,
                   ),
                   _PayrollRow(
-                    'Reimbursements',
-                    '+ ₹${reimb.toStringAsFixed(0)}',
-                    const Color(0xFF9FE1CB),
+                    'Absence deductions',
+                    '− ₹${deductions.toStringAsFixed(0)}',
+                    const Color(0xFFF5B7A8),
                     false,
                   ),
                   const Divider(color: Colors.white24, height: 20),
                   _PayrollRow(
                     'Net Payable',
-                    '₹${gross.toStringAsFixed(0)}',
+                    '₹${net.toStringAsFixed(0)}',
                     Colors.white,
                     true,
+                  ),
+                  _PayrollRow(
+                    'Claims (paid separately)',
+                    '₹${reimb.toStringAsFixed(0)}',
+                    const Color(0xFF9FE1CB),
+                    false,
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -260,6 +406,24 @@ class _SalaryScreenState extends State<SalaryScreen> {
               final isPaid = s['status'] == 'paid';
               final sBase = (s['base_salary'] as num).toDouble();
               final sReimb = (s['reimbursements'] as num).toDouble();
+              final sDeduction = (s['deduction'] as num?)?.toDouble() ?? 0;
+              final sNet = SalaryService.netOf(s as Map);
+              // Null on records generated before absences were tracked
+              final workingDays = s['working_days'] as num?;
+              final paidDays = s['paid_days'] as num?;
+              final absentDays = s['absent_days'] as num?;
+              final salaryId = s['id'].toString();
+              final hasSlip = s['slip_path'] != null;
+              final slipBusy = _slipBusyId == salaryId;
+              // Joined part-way through this month: days before are unpaid
+              final joined = DateTime.tryParse(
+                (user?['joining_date'] ?? '').toString(),
+              );
+              final joinedThisMonth =
+                  joined != null &&
+                  joined.year == _year &&
+                  joined.month == _month &&
+                  joined.day > 1;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -306,7 +470,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '₹${sBase.toStringAsFixed(0)}',
+                              '₹${sNet.toStringAsFixed(0)}',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -346,32 +510,159 @@ class _SalaryScreenState extends State<SalaryScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _BreakdownItem(
-                            'Gross',
+                            'Base',
                             '₹${sBase.toStringAsFixed(0)}',
                             kDeepBlue,
                           ),
                           _BreakdownItem(
-                            'Reimb',
-                            '₹${sReimb.toStringAsFixed(0)}',
-                            kForest,
+                            'Absent',
+                            absentDays == null ? '—' : '${absentDays}d',
+                            kDanger,
+                          ),
+                          _BreakdownItem(
+                            'Deduction',
+                            '− ₹${sDeduction.toStringAsFixed(0)}',
+                            kDanger,
                           ),
                           _BreakdownItem(
                             'Net',
-                            '₹${sBase.toStringAsFixed(0)}',
-                            kDeepBlue,
+                            '₹${sNet.toStringAsFixed(0)}',
+                            kForest,
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            [
+                              if (joinedThisMonth)
+                                'Joined ${joined.day} ${_monthNames[_month]}',
+                              if (workingDays != null)
+                                'Paid ${paidDays ?? 0} of $workingDays working days',
+                              if (sReimb > 0)
+                                'Claims ₹${sReimb.toStringAsFixed(0)} paid separately',
+                            ].join(' · '),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              color: kTealGray,
+                            ),
+                          ),
+                        ),
+                        // Opens the day-by-day list with the absent dates
+                        TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EmployeeHistoryScreen(
+                                employeeId: s['user_id'].toString(),
+                                employeeName: name.toString(),
+                                initialMonth: _month,
+                                initialYear: _year,
+                              ),
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: kDeepBlue,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'View absences',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: slipBusy
+                                ? null
+                                : () => _uploadSlip(salaryId),
+                            icon: slipBusy
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: kDeepBlue,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.upload_file_outlined,
+                                    size: 16,
+                                  ),
+                            label: Text(
+                              hasSlip ? 'Replace slip' : 'Upload slip',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kDeepBlue,
+                              side: const BorderSide(color: kBorder),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                            ),
+                          ),
+                        ),
+                        if (hasSlip) ...[
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _viewSlip(salaryId),
+                              icon: const Icon(
+                                Icons.description_outlined,
+                                size: 16,
+                              ),
+                              label: Text(
+                                'View slip',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: kForest,
+                                side: const BorderSide(color: kForest),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 9,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (!isPaid) ...[
                       const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: () => _markPaid(i),
-                          icon: const Icon(Icons.send, size: 14),
+                          onPressed: monthOver ? () => _markPaid(i) : null,
+                          icon: Icon(
+                            monthOver ? Icons.send : Icons.lock_clock_outlined,
+                            size: 14,
+                          ),
                           label: Text(
-                            'Mark as Paid',
+                            monthOver
+                                ? 'Mark as Paid'
+                                : 'Payable from 1 ${_monthNames[payableFrom.month]}',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -380,6 +671,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kDeepBlue,
                             foregroundColor: Colors.white,
+                            disabledBackgroundColor: kOffWhite,
+                            disabledForegroundColor: kTealGray,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),

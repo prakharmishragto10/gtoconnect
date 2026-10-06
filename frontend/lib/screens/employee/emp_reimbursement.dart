@@ -47,13 +47,21 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
   Future<void> _loadClaims() async {
     try {
       final data = await ReimbursementService.getMyClaims();
+      if (!mounted) return;
       setState(() {
         _claims = data.map((c) => Map<String, dynamic>.from(c)).toList();
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _pickAndUploadImage() async {
@@ -63,7 +71,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
       imageQuality: 80,
       maxWidth: 1280,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
 
     setState(() => _uploading = true);
 
@@ -75,6 +83,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
 
       final result = await Api.uploadFile('/api/upload', bytes, fileName, mime);
 
+      if (!mounted) return;
       setState(() {
         _receiptUrl = result['url'];
         _receiptFileName = fileName;
@@ -83,6 +92,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
 
       _showSnack('Receipt uploaded ✓', kForest);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _uploading = false);
       _showSnack(e.toString().replaceAll('Exception: ', ''), kDanger);
     }
@@ -112,6 +122,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
         description: _descCtrl.text,
         receiptUrl: _receiptUrl!,
       );
+      if (!mounted) return;
       setState(() {
         _claims.insert(0, Map<String, dynamic>.from(claim));
         _submitting = false;
@@ -123,6 +134,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
       });
       _showSnack('Claim submitted successfully', kForest);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _submitting = false);
       _showSnack(e.toString().replaceAll('Exception: ', ''), kDanger);
     }
@@ -176,7 +188,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
                     ),
                   ),
                   Text(
-                    'March 2026',
+                    'All your claims',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       color: kTealGray,
@@ -234,7 +246,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
               _MiniStat(
                 label: 'Approved',
                 value: '${approved.length}',
-                sub: 'This month',
+                sub: 'All time',
                 color: kForest,
                 bg: kSuccessBg,
               ),
@@ -242,7 +254,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
               _MiniStat(
                 label: 'Paid',
                 value: '${paid.length}',
-                sub: 'This month',
+                sub: 'All time',
                 color: kDeepBlue,
                 bg: kInfoBg,
               ),
@@ -250,7 +262,7 @@ class _EmpReimbursementState extends State<EmpReimbursement> {
               _MiniStat(
                 label: 'Rejected',
                 value: '${rejected.length}',
-                sub: 'This month',
+                sub: 'All time',
                 color: kDanger,
                 bg: kDangerBg,
               ),
@@ -785,10 +797,19 @@ class _ClaimCard extends StatelessWidget {
                     onTap: () async {
                       final url = claim['receipt_url'] as String;
                       final uri = Uri.parse(url);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(
+                      final messenger = ScaffoldMessenger.of(context);
+                      var opened = false;
+                      try {
+                        opened = await launchUrl(
                           uri,
                           mode: LaunchMode.externalApplication,
+                        );
+                      } catch (_) {}
+                      if (!opened) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not open the receipt'),
+                          ),
                         );
                       }
                     },

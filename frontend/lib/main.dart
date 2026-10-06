@@ -2,13 +2,26 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/colors.dart';
+import 'services/api.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin/admin_home.dart';
 import 'screens/employee/employee_home.dart';
 import 'screens/subadmin/subadmin_home.dart';
 
-void main() => runApp(const GTOPortalApp());
+final _navigatorKey = GlobalKey<NavigatorState>();
+
+void main() {
+  // Any 401 outside login means the session is dead: sign out and go to login.
+  Api.onUnauthorized = () async {
+    await AuthService.logout();
+    _navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+  };
+  runApp(const GTOPortalApp());
+}
 
 class GTOPortalApp extends StatelessWidget {
   const GTOPortalApp({super.key});
@@ -16,6 +29,7 @@ class GTOPortalApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'GTO Connect',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -354,7 +368,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (isLoggedIn) {
-      final user = await AuthService.getCurrentUser();
+      final user = await AuthService.refreshCurrentUser();
       if (!mounted) return;
       if (user != null) {
         Navigator.pushReplacement(

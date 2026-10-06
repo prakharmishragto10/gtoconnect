@@ -1,6 +1,7 @@
 import supabase from "../config/supabase.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { isWorkingDate } from "../utils/weeklyOff.js";
 
 export const loginUser = async (email, password) => {
   const { data: user, error } = await supabase
@@ -62,7 +63,9 @@ export const getMe = async (userId) => {
   return user;
 };
 
-export const getAllUsers = async () => {
+// With `date` ("YYYY-MM-DD"), each employee also gets `is_working_day` for
+// that date, so attendance views can tell a weekly off from an absence.
+export const getAllUsers = async (date = null) => {
   const { data, error } = await supabase
     .from("users")
     .select("id, name, email, role, designation, location, upi_id, base_salary, joining_date")
@@ -70,7 +73,12 @@ export const getAllUsers = async () => {
     .order("name");
 
   if (error) throw new Error(error.message);
-  return data;
+  if (!date) return data;
+
+  return data.map((user) => ({
+    ...user,
+    is_working_day: isWorkingDate(user.location, date),
+  }));
 };
 
 export const updatePassword = async (email, password) => {
@@ -81,6 +89,10 @@ export const updatePassword = async (email, password) => {
     .eq("email", email.toLowerCase().trim())
     .single();
   if (error || !user) throw new Error("User not found");
+
+  if (typeof password !== "string" || password.length < 8) {
+    throw new Error("Password must be at least 8 characters");
+  }
 
   // 2. Hash password using bcrypt
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -107,12 +119,14 @@ export const createEmployee = async ({
   base_salary,
   joining_date,
 }) => {
+  if (!name.trim()) throw new Error("Name is required");
+
   // 1. Check if email already exists
   const { data: existing } = await supabase
     .from("users")
     .select("id")
     .eq("email", email.toLowerCase().trim())
-    .single();
+    .maybeSingle();
 
   if (existing) throw new Error("Email already registered");
 
@@ -130,7 +144,7 @@ export const createEmployee = async ({
       designation: designation?.trim() || null,
       location: location?.trim() || null,
       upi_id: upi_id?.trim() || null,
-      base_salary: base_salary || null,
+      base_salary: base_salary == null || base_salary === "" ? null : Number(base_salary),
       joining_date: joining_date || null,
     })
     .select("id, name, email, role, designation, location, upi_id, base_salary, joining_date")
@@ -150,7 +164,9 @@ export const deleteEmployee = async (userId) => {
     .single();
 
   if (fetchError || !user) throw new Error("User not found");
-  if (user.role === "admin") throw new Error("Cannot delete an admin account");
+  if (user.role !== "employee") {
+    throw new Error("Only employee accounts can be deleted here");
+  }
 
   const { error } = await supabase.from("users").delete().eq("id", userId);
 
@@ -165,6 +181,29 @@ export const updateEmployee = async (userId, fields) => {
     if (fields[key] !== undefined) updates[key] = fields[key];
   }
   if (Object.keys(updates).length === 0) throw new Error("No valid fields to update");
+
+  if (updates.name !== undefined) {
+    updates.name = String(updates.name ?? "").trim();
+    if (!updates.name) throw new Error("Name is required");
+  }
+  if (updates.base_salary !== undefined && updates.base_salary !== null) {
+    const salary = Number(updates.base_salary);
+    if (!Number.isFinite(salary) || salary < 0) {
+      throw new Error("Salary must be a valid number");
+    }
+    updates.base_salary = salary;
+  }
+
+  // This route manages employees only, never admin or sub-admin accounts
+  const { data: target, error: targetError } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (targetError || !target) throw new Error("User not found");
+  if (target.role !== "employee") {
+    throw new Error("Only employee accounts can be edited here");
+  }
 
   const { data, error } = await supabase
     .from("users")

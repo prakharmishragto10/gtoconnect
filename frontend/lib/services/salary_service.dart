@@ -31,4 +31,33 @@ class SalaryService {
   static Future<void> markPaid(String salaryId) async {
     await Api.patch('/api/salary/$salaryId/paid');
   }
+
+  /// Net pay through payroll: base salary minus the absence deduction.
+  static double netOf(Map<dynamic, dynamic> record) {
+    final base = (record['base_salary'] as num?)?.toDouble() ?? 0;
+    final deduction = (record['deduction'] as num?)?.toDouble() ?? 0;
+    return base - deduction;
+  }
+
+  // ── Salary slips ──────────────────────────────────────────────────────────
+  static Future<void> uploadSlip(
+    String salaryId,
+    List<int> bytes,
+    String fileName,
+    String mimeType,
+  ) async {
+    await Api.uploadFile(
+      '/api/salary/$salaryId/slip',
+      bytes,
+      fileName,
+      mimeType,
+      field: 'slip',
+    );
+  }
+
+  /// Short-lived link to the slip. Staff can open any; employees only theirs.
+  static Future<String> getSlipUrl(String salaryId) async {
+    final data = await Api.get('/api/salary/$salaryId/slip');
+    return data['url'] as String;
+  }
 }

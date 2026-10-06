@@ -34,7 +34,7 @@ export const me = async (req, res) => {
 
 export const employees = async (req, res) => {
   try {
-    const users = await getAllUsers();
+    const users = await getAllUsers(req.query.date || null);
     res.json({ users });
   } catch (err) {
     res.status(500).json({ error: err.message });

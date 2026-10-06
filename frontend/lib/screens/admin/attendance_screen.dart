@@ -50,7 +50,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (_filterMode == AttendanceFilterMode.day) {
         final dateStr = _formatDateYMD(_selectedDate);
         final results = await Future.wait([
-          AuthService.getEmployees(),
+          AuthService.getEmployees(date: dateStr),
           AttendanceService.getAllToday(date: dateStr),
         ]);
 
@@ -70,7 +70,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         }).toList();
 
         entries.sort((a, b) {
-          const order = {'present': 0, 'late': 1, 'absent': 2};
+          const order = {'present': 0, 'late': 1, 'absent': 2, 'off': 3};
           return (order[a.status] ?? 3).compareTo(order[b.status] ?? 3);
         });
 
@@ -137,6 +137,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
     return 0;
   }
+
+  // Staff on their weekly off who did not check in (Day mode only)
+  int get _offCount => _filterMode == AttendanceFilterMode.day
+      ? _entries.where((e) => e.status == 'off').length
+      : 0;
 
   int get _totalCount {
     if (_filterMode == AttendanceFilterMode.day) {
@@ -452,6 +457,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           color: kDanger,
                           bg: kDangerBg,
                         ),
+                      if (_offCount > 0)
+                        _SummaryChip(
+                          label: 'Weekly off',
+                          value: '$_offCount',
+                          color: kTealGray,
+                          bg: Colors.white,
+                        ),
                       _SummaryChip(
                         label: _filterMode == AttendanceFilterMode.day
                             ? 'Total Team'
@@ -554,7 +566,7 @@ class _EmpAttEntry {
   final String name;
   final String role;
   final String location;
-  final String status; // present | late | absent
+  final String status; // present | late | absent | off (weekly off)
   final String checkIn;
   final String checkOut;
 
@@ -586,7 +598,10 @@ class _EmpAttEntry {
       return '$h:$m $ampm';
     }
 
-    final status = att?['status']?.toString() ?? 'absent';
+    // No check-in on the employee's weekly off is "off", not an absence
+    final status =
+        att?['status']?.toString() ??
+        (emp['is_working_day'] == false ? 'off' : 'absent');
     return _EmpAttEntry(
       id: id,
       name: emp['name']?.toString() ?? 'Unknown',
@@ -646,16 +661,21 @@ class _EmployeeAttCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPresent = entry.status == 'present';
     final isLate = entry.status == 'late';
+    final isOff = entry.status == 'off';
     final Color sc = isPresent
         ? kForest
         : isLate
             ? kWarn
-            : kDanger;
+            : isOff
+                ? kTealGray
+                : kDanger;
     final Color sb = isPresent
         ? kSuccessBg
         : isLate
             ? kWarnBg
-            : kDangerBg;
+            : isOff
+                ? kOffWhite
+                : kDangerBg;
 
     return InkWell(
       onTap: () {

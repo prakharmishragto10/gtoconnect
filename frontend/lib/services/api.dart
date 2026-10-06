@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,10 @@ import '../core/env.dart';
 
 class Api {
   static const String baseUrl = Env.baseUrl;
+
+  /// Called when the server rejects the stored token (expired, or the account
+  /// was removed). The app uses it to return to the login screen.
+  static void Function()? onUnauthorized;
 
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -31,10 +36,25 @@ class Api {
     };
   }
 
+  // Without a timeout a dropped connection leaves screens on a spinner forever
+  static Future<http.Response> _send(
+    Future<http.Response> request, {
+    int seconds = 30,
+  }) async {
+    try {
+      return await request.timeout(Duration(seconds: seconds));
+    } on TimeoutException {
+      throw Exception('The server took too long to respond. Please try again.');
+    } on http.ClientException {
+      throw Exception(
+        'Could not reach the server. Check your internet connection.',
+      );
+    }
+  }
+
   static Future<Map<String, dynamic>> get(String endpoint) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: await _headers(),
+    final res = await _send(
+      http.get(Uri.parse('$baseUrl$endpoint'), headers: await _headers()),
     );
     return _handle(res);
   }
@@ -43,10 +63,12 @@ class Api {
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: await _headers(),
-      body: body != null ? jsonEncode(body) : null,
+    final res = await _send(
+      http.post(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: await _headers(),
+        body: body != null ? jsonEncode(body) : null,
+      ),
     );
     return _handle(res);
   }
@@ -55,18 +77,19 @@ class Api {
     String endpoint, {
     Map<String, dynamic>? body,
   }) async {
-    final res = await http.patch(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: await _headers(),
-      body: body != null ? jsonEncode(body) : null,
+    final res = await _send(
+      http.patch(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: await _headers(),
+        body: body != null ? jsonEncode(body) : null,
+      ),
     );
     return _handle(res);
   }
 
   static Future<Map<String, dynamic>> delete(String endpoint) async {
-    final res = await http.delete(
-      Uri.parse('$baseUrl$endpoint'),
-      headers: await _headers(),
+    final res = await _send(
+      http.delete(Uri.parse('$baseUrl$endpoint'), headers: await _headers()),
     );
     return _handle(res);
   }
@@ -90,6 +113,13 @@ class Api {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return data;
     }
+    // A 401 from login just means wrong credentials; anywhere else the
+    // session is no longer valid.
+    final isLogin = res.request?.url.path.endsWith('/api/auth/login') ?? false;
+    if (res.statusCode == 401 && !isLogin) {
+      onUnauthorized?.call();
+      throw Exception('Session expired. Please sign in again.');
+    }
     throw Exception(data['error'] ?? 'Something went wrong (${res.statusCode})');
   }
 
@@ -97,8 +127,9 @@ class Api {
     String endpoint,
     List<int> fileBytes,
     String fileName,
-    String mimeType,
-  ) async {
+    String mimeType, {
+    String field = 'receipt',
+  }) async {
     final token = await _getToken();
     final uri = Uri.parse('$baseUrl$endpoint');
 
@@ -109,15 +140,17 @@ class Api {
 
     request.files.add(
       http.MultipartFile.fromBytes(
-        'receipt',
+        field,
         fileBytes,
         filename: fileName,
         contentType: MediaType.parse(mimeType),
       ),
     );
 
-    final streamed = await request.send();
-    final res = await http.Response.fromStream(streamed);
+    final res = await _send(
+      request.send().then(http.Response.fromStream),
+      seconds: 90,
+    );
     return _handle(res);
   }
 }

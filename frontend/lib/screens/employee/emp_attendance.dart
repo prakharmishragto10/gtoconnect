@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -28,8 +29,10 @@ class _EmpAttendanceState extends State<EmpAttendance> {
   String _checkOutTime = '--:--';
   String? _liveLocationName;
   List<dynamic> _history = [];
+  Timer? _autoCheckoutTimer;
 
-  EmpAttendanceFilterMode _filterMode = EmpAttendanceFilterMode.all;
+  // Opens on the month view: it is the one that lists absent and off days
+  EmpAttendanceFilterMode _filterMode = EmpAttendanceFilterMode.month;
   DateTime _selectedDate = DateTime.now();
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
@@ -54,6 +57,23 @@ class _EmpAttendanceState extends State<EmpAttendance> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _autoCheckoutTimer?.cancel();
+    super.dispose();
+  }
+
+  // The server checks everyone out at 6:30 PM IST; reload just after so the
+  // screen reflects it and location sharing stops.
+  void _scheduleAutoCheckoutRefresh() {
+    _autoCheckoutTimer?.cancel();
+    final left = AttendanceService.untilAutoCheckout();
+    if (!_isOnDuty || left == null) return;
+    _autoCheckoutTimer = Timer(left + const Duration(seconds: 5), () {
+      if (mounted) _loadData();
+    });
   }
 
   Future<void> _loadData() async {
@@ -89,8 +109,17 @@ class _EmpAttendanceState extends State<EmpAttendance> {
               setState(() => _liveLocationName = name);
             }
           });
+        } else if (_alreadyDone) {
+          LocationService.stopTracking();
+          _locationOn = false;
         }
+      } else {
+        _isOnDuty = false;
+        _alreadyDone = false;
+        _checkInTime = '--:--';
+        _checkOutTime = '--:--';
       }
+      _scheduleAutoCheckoutRefresh();
 
       await _fetchHistory();
 
@@ -105,6 +134,7 @@ class _EmpAttendanceState extends State<EmpAttendance> {
   }
 
   Future<void> _fetchHistory() async {
+    if (!mounted) return;
     setState(() {
       _historyLoading = true;
       _historyError = null;
@@ -124,11 +154,21 @@ class _EmpAttendanceState extends State<EmpAttendance> {
         year = _selectedYear;
       }
 
-      final history = await AttendanceService.getMyHistory(
-        date: date,
-        month: month,
-        year: year,
-      );
+      final List<dynamic> history;
+      if (_filterMode == EmpAttendanceFilterMode.month) {
+        // Month view includes the days with no check-in (absent / weekly off)
+        final calendar = await AttendanceService.getMyCalendar(
+          _selectedMonth,
+          _selectedYear,
+        );
+        history = calendar['days'] as List<dynamic>? ?? [];
+      } else {
+        history = await AttendanceService.getMyHistory(
+          date: date,
+          month: month,
+          year: year,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -154,6 +194,8 @@ class _EmpAttendanceState extends State<EmpAttendance> {
       if (_isOnDuty) {
         await AttendanceService.checkOut();
         LocationService.stopTracking();
+        _autoCheckoutTimer?.cancel();
+        if (!mounted) return;
         final now = DateTime.now();
         setState(() {
           _isOnDuty = false;
@@ -166,12 +208,9 @@ class _EmpAttendanceState extends State<EmpAttendance> {
       } else {
         // 1. Mandatory Location check
         final pos = await LocationService.ensureLocationForCheckIn();
-        final place = await LocationService.getAddressFromCoords(
-          pos.latitude,
-          pos.longitude,
-        );
 
-        // 2. Check in with coordinates
+        // 2. Check in with coordinates. The place name is looked up afterwards
+        // so a slow lookup cannot delay the check-in time.
         final att = await AttendanceService.checkIn(
           latitude: pos.latitude,
           longitude: pos.longitude,
@@ -186,11 +225,19 @@ class _EmpAttendanceState extends State<EmpAttendance> {
         final status = att['status']?.toString() ?? 'present';
         final isLate = status == 'late';
 
+        if (!mounted) return;
+        LocationService.getAddressFromCoords(pos.latitude, pos.longitude).then((
+          place,
+        ) {
+          if (place != null && mounted) {
+            setState(() => _liveLocationName = place);
+          }
+        });
+
         setState(() {
           _isOnDuty = true;
           _alreadyDone = false;
           _locationOn = true;
-          _liveLocationName = place;
           _checkInTime =
               '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
           _checkOutTime = '--:--';
@@ -203,9 +250,12 @@ class _EmpAttendanceState extends State<EmpAttendance> {
           isLate ? kWarn : kForest,
         );
       }
+      _scheduleAutoCheckoutRefresh();
       _fetchHistory();
     } catch (e) {
       _showSnack(e.toString().replaceAll('Exception: ', ''), kDanger);
+      // The server may have auto checked out already; resync the screen
+      await _loadData();
     }
 
     if (mounted) {
@@ -222,6 +272,7 @@ class _EmpAttendanceState extends State<EmpAttendance> {
       try {
         await LocationService.startTracking();
         final place = await LocationService.getCurrentLocationName();
+        if (!mounted) return;
         setState(() {
           _locationOn = true;
           if (place != null) _liveLocationName = place;
@@ -895,15 +946,20 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = record['status'] as String? ?? 'present';
+    final isOff = status == 'off';
     Color sc = status == 'present'
         ? kForest
         : status == 'late'
         ? kWarn
+        : isOff
+        ? kTealGray
         : kDanger;
     Color sb = status == 'present'
         ? kSuccessBg
         : status == 'late'
         ? kWarnBg
+        : isOff
+        ? kOffWhite
         : kDangerBg;
 
     String formatTime(String? t) {
@@ -945,6 +1001,8 @@ class _HistoryRow extends StatelessWidget {
                   ? Icons.check_circle_outline
                   : status == 'late'
                   ? Icons.watch_later_outlined
+                  : isOff
+                  ? Icons.weekend_outlined
                   : Icons.cancel_outlined,
               size: 18,
               color: sc,
@@ -964,7 +1022,11 @@ class _HistoryRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'In: $checkIn  ·  Out: $checkOut',
+                  isOff
+                      ? 'Weekly off'
+                      : status == 'absent'
+                      ? 'No check-in'
+                      : 'In: $checkIn  ·  Out: $checkOut',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     color: kTealGray,
@@ -995,7 +1057,7 @@ class _HistoryRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              status.toUpperCase(),
+              isOff ? 'OFF' : status.toUpperCase(),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 9,
                 fontWeight: FontWeight.w600,

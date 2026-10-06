@@ -10,10 +10,16 @@ class EmployeeHistoryScreen extends StatefulWidget {
   final String employeeId;
   final String employeeName;
 
+  /// Month to open on. Defaults to the current month.
+  final int? initialMonth;
+  final int? initialYear;
+
   const EmployeeHistoryScreen({
     super.key,
     required this.employeeId,
     required this.employeeName,
+    this.initialMonth,
+    this.initialYear,
   });
 
   @override
@@ -25,10 +31,11 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
   String? _error;
   List<dynamic> _history = [];
 
-  EmpHistoryFilterMode _filterMode = EmpHistoryFilterMode.all;
+  // Opens on the month view: it is the one that lists absent and off days
+  EmpHistoryFilterMode _filterMode = EmpHistoryFilterMode.month;
   DateTime _selectedDate = DateTime.now();
-  int _selectedMonth = DateTime.now().month;
-  int _selectedYear = DateTime.now().year;
+  late int _selectedMonth = widget.initialMonth ?? DateTime.now().month;
+  late int _selectedYear = widget.initialYear ?? DateTime.now().year;
 
   static const _monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -64,12 +71,23 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
         year = _selectedYear;
       }
 
-      final data = await AttendanceService.getEmployeeHistory(
-        widget.employeeId,
-        date: date,
-        month: month,
-        year: year,
-      );
+      final List<dynamic> data;
+      if (_filterMode == EmpHistoryFilterMode.month) {
+        // Month view includes the days with no check-in (absent / weekly off)
+        final calendar = await AttendanceService.getEmployeeCalendar(
+          widget.employeeId,
+          _selectedMonth,
+          _selectedYear,
+        );
+        data = calendar['days'] as List<dynamic>? ?? [];
+      } else {
+        data = await AttendanceService.getEmployeeHistory(
+          widget.employeeId,
+          date: date,
+          month: month,
+          year: year,
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -109,6 +127,8 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
 
   int get _presentCount => _history.where((r) => r['status'] == 'present').length;
   int get _lateCount => _history.where((r) => r['status'] == 'late').length;
+  int get _absentCount =>
+      _history.where((r) => r['status'] == 'absent').length;
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -316,12 +336,20 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                     bg: kWarnBg,
                   ),
                   const SizedBox(width: 8),
-                  _SummaryMiniChip(
-                    label: 'Total',
-                    value: '${_history.length}',
-                    color: kDeepBlue,
-                    bg: kInfoBg,
-                  ),
+                  if (_filterMode == EmpHistoryFilterMode.month)
+                    _SummaryMiniChip(
+                      label: 'Absent',
+                      value: '$_absentCount',
+                      color: kDanger,
+                      bg: kDangerBg,
+                    )
+                  else
+                    _SummaryMiniChip(
+                      label: 'Total',
+                      value: '${_history.length}',
+                      color: kDeepBlue,
+                      bg: kInfoBg,
+                    ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -383,9 +411,23 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                   final status = record['status']?.toString() ?? 'absent';
                   final isPresent = status == 'present';
                   final isLate = status == 'late';
+                  final isOff = status == 'off';
+                  final checkedIn = isPresent || isLate;
 
-                  final Color sc = isPresent ? kForest : isLate ? kWarn : kDanger;
-                  final Color sb = isPresent ? kSuccessBg : isLate ? kWarnBg : kDangerBg;
+                  final Color sc = isPresent
+                      ? kForest
+                      : isLate
+                      ? kWarn
+                      : isOff
+                      ? kTealGray
+                      : kDanger;
+                  final Color sb = isPresent
+                      ? kSuccessBg
+                      : isLate
+                      ? kWarnBg
+                      : isOff
+                      ? kOffWhite
+                      : kDangerBg;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -416,7 +458,7 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                status.toUpperCase(),
+                                isOff ? 'WEEKLY OFF' : status.toUpperCase(),
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w700,
@@ -426,7 +468,9 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        // Absent and weekly-off days have no times to show
+                        if (checkedIn) const SizedBox(height: 10),
+                        if (checkedIn)
                         Row(
                           children: [
                             Expanded(

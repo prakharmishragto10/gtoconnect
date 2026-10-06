@@ -9,10 +9,13 @@ const uploader = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+    // An explicit list: "image/*" would also admit SVG, which can carry
+    // scripts and is served from a public bucket.
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only images allowed"));
+      cb(new Error("Only JPG, PNG or WEBP images allowed"));
     }
   },
 });

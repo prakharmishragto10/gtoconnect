@@ -24,12 +24,13 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
   Future<void> _loadClaims() async {
     try {
       final data = await ReimbursementService.getAllClaims();
+      if (!mounted) return;
       setState(() {
         _claims = data.map((c) => Map<String, dynamic>.from(c)).toList();
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -37,8 +38,8 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
     try {
       final claim = _claims[index];
       await ReimbursementService.updateStatus(claim['id'], status);
-      setState(() => _claims[index]['status'] = status);
       if (!mounted) return;
+      setState(() => claim['status'] = status);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -62,6 +63,8 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
           backgroundColor: kDanger,
         ),
       );
+      // Someone else may have acted on this claim already; show the real state
+      _loadClaims();
     }
   }
 
@@ -415,10 +418,19 @@ class _ClaimCard extends StatelessWidget {
                     onTap: () async {
                       final url = claim['receipt_url'] as String;
                       final uri = Uri.parse(url);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(
+                      final messenger = ScaffoldMessenger.of(context);
+                      var opened = false;
+                      try {
+                        opened = await launchUrl(
                           uri,
                           mode: LaunchMode.externalApplication,
+                        );
+                      } catch (_) {}
+                      if (!opened) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not open the receipt'),
+                          ),
                         );
                       }
                     },

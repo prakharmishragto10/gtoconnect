@@ -1,10 +1,15 @@
 import supabase from "../config/supabase.js";
+import { fetchAll } from "../utils/db.js";
+import { attachSubmitters } from "./reimbursement.service.js";
 
 export const submitTravel = async (userId, data) => {
   const { place, start_date, end_date, work, reason } = data;
 
   if (!place || !start_date || !end_date || !work || !reason) {
     throw new Error("All fields are required");
+  }
+  if (String(end_date) < String(start_date)) {
+    throw new Error("End date cannot be before start date");
   }
 
   const { data: record, error } = await supabase
@@ -39,30 +44,14 @@ export const getMyTravelRequests = async (userId) => {
 };
 
 export const getAllTravelRequests = async (status = null) => {
-  let query = supabase
-    .from("travel_requests")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const data = await fetchAll(() => {
+    let query = supabase.from("travel_requests").select("*");
+    if (status) query = query.eq("status", status);
+    return query.order("created_at", { ascending: false }).order("id");
+  });
 
-  if (status) {
-    query = query.eq("status", status);
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  const enriched = await Promise.all(
-    (data || []).map(async (req) => {
-      const { data: user } = await supabase
-        .from("users")
-        .select("id, name, email, designation, location")
-        .eq("id", req.user_id)
-        .single();
-      return { ...req, users: user, submitter: user };
-    })
-  );
-
-  return enriched;
+  const enriched = await attachSubmitters(data);
+  return enriched.map((req) => ({ ...req, users: req.submitter }));
 };
 
 export const updateTravelStatus = async (id, status, adminId) => {
@@ -76,8 +65,9 @@ export const updateTravelStatus = async (id, status, adminId) => {
     .update({ status, reviewed_by: adminId, reviewed_at: new Date().toISOString() })
     .eq("id", id)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Travel request not found");
   return data;
 };

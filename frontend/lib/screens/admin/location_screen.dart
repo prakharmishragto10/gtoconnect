@@ -38,12 +38,13 @@ class _LocationScreenState extends State<LocationScreen> {
   Future<void> _loadLocations() async {
     try {
       final data = await LocationService.getAllLive();
+      if (!mounted) return;
       setState(() {
         _locations = data;
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 

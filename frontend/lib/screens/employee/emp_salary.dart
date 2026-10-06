@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
 import '../../models/user.dart';
 import '../../services/salary_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EmpSalary extends StatefulWidget {
   final UserModel user;
@@ -26,12 +27,38 @@ class _EmpSalaryState extends State<EmpSalary> {
   Future<void> _loadSalaries() async {
     try {
       final data = await SalaryService.getMyHistory();
+      if (!mounted) return;
       setState(() {
         _salaries = data.map((s) => Map<String, dynamic>.from(s)).toList();
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  bool _openingSlip = false;
+
+  Future<void> _openSlip(String salaryId) async {
+    if (_openingSlip) return;
+    setState(() => _openingSlip = true);
+    String? problem;
+    try {
+      final url = await SalaryService.getSlipUrl(salaryId);
+      final opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) problem = 'Could not open the salary slip';
+    } catch (e) {
+      problem = e.toString().replaceAll('Exception: ', '');
+    }
+    if (!mounted) return;
+    setState(() => _openingSlip = false);
+    if (problem != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(problem), backgroundColor: kDanger),
+      );
     }
   }
 
@@ -73,6 +100,13 @@ class _EmpSalaryState extends State<EmpSalary> {
     final isPaid = selected['status'] == 'paid';
     final base = (selected['base_salary'] as num).toDouble();
     final reimb = (selected['reimbursements'] as num).toDouble();
+    final deduction = (selected['deduction'] as num?)?.toDouble() ?? 0;
+    final net = SalaryService.netOf(selected);
+    // Null on records generated before absences were tracked
+    final workingDays = selected['working_days'] as num?;
+    final paidDays = selected['paid_days'] as num?;
+    final absentDays = selected['absent_days'] as num?;
+    final hasSlip = selected['slip_path'] != null;
     final month = _monthName(selected['month'] as int);
     final year = selected['year'].toString();
 
@@ -188,7 +222,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                   ),
                 ),
                 Text(
-                  '₹${base.toStringAsFixed(0)}',
+                  '₹${net.toStringAsFixed(0)}',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
@@ -230,8 +264,26 @@ class _EmpSalaryState extends State<EmpSalary> {
                 ),
                 const Divider(height: 20, color: kBorder),
                 _BreakdownRow(
-                  label: 'Reimbursements',
-                  value: '+ ₹${reimb.toStringAsFixed(0)}',
+                  label: 'Paid days',
+                  value: workingDays == null
+                      ? '—'
+                      : '${paidDays ?? 0} of $workingDays',
+                  valueColor: kDeepBlue,
+                  icon: Icons.event_available_outlined,
+                ),
+                const Divider(height: 20, color: kBorder),
+                _BreakdownRow(
+                  label: absentDays == null
+                      ? 'Absence deduction'
+                      : 'Absent $absentDays day${absentDays == 1 ? '' : 's'}',
+                  value: '− ₹${deduction.toStringAsFixed(0)}',
+                  valueColor: kDanger,
+                  icon: Icons.event_busy_outlined,
+                ),
+                const Divider(height: 20, color: kBorder),
+                _BreakdownRow(
+                  label: 'Reimbursements (paid separately)',
+                  value: '₹${reimb.toStringAsFixed(0)}',
                   valueColor: kForest,
                   icon: Icons.receipt_outlined,
                 ),
@@ -248,7 +300,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                       ),
                     ),
                     Text(
-                      '₹${base.toStringAsFixed(0)}',
+                      '₹${net.toStringAsFixed(0)}',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -261,6 +313,35 @@ class _EmpSalaryState extends State<EmpSalary> {
             ),
           ),
           const SizedBox(height: 16),
+
+          if (hasSlip) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _openingSlip
+                    ? null
+                    : () => _openSlip(selected['id'].toString()),
+                icon: const Icon(Icons.description_outlined, size: 18),
+                label: Text(
+                  'View salary slip',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kDeepBlue,
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: kBorder),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // History
           Text(
@@ -330,7 +411,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${base.toStringAsFixed(0)}',
+                        '₹${SalaryService.netOf(s).toStringAsFixed(0)}',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,

@@ -67,6 +67,10 @@ export const updateStatus = async (req, res) => {
 export const getOne = async (req, res) => {
   try {
     const data = await getClaimById(req.params.id);
+    const isStaff = req.user.role === "admin" || req.user.role === "subadmin";
+    if (!isStaff && data.user_id !== req.user.id) {
+      return res.status(404).json({ error: "Claim not found" });
+    }
     res.json({ reimbursement: data });
   } catch (err) {
     res.status(404).json({ error: err.message });
