@@ -284,7 +284,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      child: Image.asset('assets/gto.png', fit: BoxFit.contain),
+                      child: Image.asset(
+                        'assets/logo_mark.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

@@ -25,12 +25,27 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_lints: ^6.0.0
 
+# Home-screen / browser icons. After changing the images run:
+#   dart run flutter_launcher_icons
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/gto.png"
+  remove_alpha_ios: true
+  image_path: "assets/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/app_icon_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/app_icon.png"
+    background_color: "#FFFFFF"
+    theme_color: "#0B2545"
+  windows:
+    generate: true
+    image_path: "assets/app_icon.png"
+    icon_size: 48
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/gto.png
+    - assets/logo_mark.png
+    - assets/logo_full.png

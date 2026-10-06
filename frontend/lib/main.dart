@@ -438,7 +438,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset('assets/gto.png', width: 400),
+                      Image.asset('assets/logo_full.png', width: 260),
                       const SizedBox(height: 16),
                       const SizedBox(height: 28),
                       const SizedBox(

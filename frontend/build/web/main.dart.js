@@ -99549,7 +99549,7 @@ n===$&&A.a()
 r=p.r
 r===$&&A.a()
 q=t.p
-return A.Gg(o,o,A.ai(o,A.fL(B.by,A.b([s,A.cd(new A.cP(n,!1,A.aoD(A.ah(A.b([A.aTt("assets/gto.png",o,400),B.a_,B.oB,B.YI],q),B.l,B.f,B.a7),r),o),o,o)],q),B.B,B.bn,o),B.k,o,o,B.FL,o,o,o,o,o,o,o),o,o)}}
+return A.Gg(o,o,A.ai(o,A.fL(B.by,A.b([s,A.cd(new A.cP(n,!1,A.aoD(A.ah(A.b([A.aTt("assets/logo_full.png",o,260),B.a_,B.oB,B.YI],q),B.l,B.f,B.a7),r),o),o,o)],q),B.B,B.bn,o),B.k,o,o,B.FL,o,o,o,o,o,o,o),o,o)}}
 A.aIu.prototype={
 $0(){},
 $S:0}
@@ -103574,7 +103574,7 @@ C(a){var s=null,r=A.b6(a,s,t.w).w,q=r.M1(r.gc0().jI(0,1.3))
 return A.mI(A.aRN(A.Gg(s,s,A.f0(B.aG,A.fL(B.by,A.b([A.am1(0,new A.iy(A.h7(s,s,s,this.w,B.K),s)),A.xE(!0,A.cd(A.fn(new A.dm(B.FD,this.adY(),s),B.oa,B.La,s,B.W),s,s),B.aL,!0)],t.p),B.B,B.bn,s),B.Y,!1,s,s,s,s,s,s,s,s,s,s,s,s,s,s,new A.aEt(a),s,s,s,s,s,s),s,!0),B.oG,t.lu),q)},
 adY(){var s,r,q,p,o,n=this,m=null,l=A.W(36),k=t.V,j=A.b([new A.bz(0,B.S,B.IV.b0(0.18),B.z0,40)],k),i=A.W(36),h=A.aTw(18,18),g=A.b([B.e.b0(0.55),B.e.b0(0.4)],t.t_),f=A.W(36),e=A.cA(B.e,6),d=A.cA(B.e,3)
 k=A.b([new A.bz(0,B.S,B.v.b0(0.08),B.dG,10)],k)
-k=A.cd(A.ai(m,A.aTt("assets/gto.png",B.FP,m),B.k,m,m,new A.ab(B.Ia,m,d,m,k,m,B.bA),m,72,m,B.ca,m,m,72),m,m)
+k=A.cd(A.ai(m,A.aTt("assets/logo_mark.png",B.FP,m),B.k,m,m,new A.ab(B.Ia,m,d,m,k,m,B.bA),m,72,m,B.ca,m,m,72),m,m)
 d=A.u("Welcome back",m,m,m,A.v().$3$color$fontSize$fontWeight(B.dZ,24,B.u),B.bI,m,m)
 s=A.u("Please enter your details to sign in.",m,m,m,A.v().$2$color$fontSize(B.IO,14),B.bI,m,m)
 r=A.aWv(B.Q5,n.d,n.f,"Enter your email...",B.oN,"E-Mail Address",!1,new A.aEl(n),m,B.Eg)
