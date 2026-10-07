@@ -30,7 +30,7 @@ class _EmpDashboardState extends State<EmpDashboard> {
   String _todayStatus = '';
   String? _liveLocationName;
   int _daysPresent = 0;
-  String _netSalary = '—';
+  String _baseSalary = '—';
   int _claimsPending = 0;
   String _claimsPaid = '₹0';
   int _travelCount = 0;
@@ -136,9 +136,10 @@ class _EmpDashboardState extends State<EmpDashboard> {
       if (mounted) {
         setState(() {
           _daysPresent = present;
-          _netSalary = salary != null
-              ? '₹${SalaryService.netOf(salary).toStringAsFixed(0)}'
-              : '—';
+          // The tile shows the agreed base salary. The month's calculated pay
+          // (after absences) lives on the Salary tab.
+          _baseSalary =
+              '₹${((salary?['base_salary'] as num?) ?? widget.user.baseSalary).toStringAsFixed(0)}';
           _claimsPending = pending.length;
           _claimsPaid = '₹${paidTotal.toStringAsFixed(0)}';
           _travelCount = travelCount;
@@ -522,8 +523,8 @@ class _EmpDashboardState extends State<EmpDashboard> {
         bg: kSuccessBg,
       ),
       DashStatCard(
-        label: 'Salary',
-        value: _netSalary,
+        label: 'Base Salary',
+        value: _baseSalary,
         icon: Icons.payments_outlined,
         color: kDeepBlue,
         bg: kInfoBg,
