@@ -1,6 +1,7 @@
 import supabase from "../config/supabase.js";
 import { fetchAll } from "../utils/db.js";
 import { weeklyOffRule, isWorkingDay } from "../utils/weeklyOff.js";
+import { getHolidayDates } from "./holiday.service.js";
 
 const DEFAULT_BASE_SALARY = 15000;
 const SLIP_BUCKET = "salary-slips";
@@ -14,7 +15,9 @@ const todayIST = () =>
 // Salary for one employee for one month:
 //   one day's pay = base salary ÷ working days in that month
 //   net           = one day's pay × paid days
-// A working day with no check-in is absent. Days before the joining date are
+// A working day with no check-in is absent. A holiday marked by the admin is
+// a paid day off: it needs no check-in and is never an absence (a holiday on
+// someone's weekly off changes nothing). Days before the joining date are
 // unpaid but not counted as absences. Today and future days are assumed
 // present, so a month generated early is provisional until refreshed.
 export const calculateSalary = ({
@@ -22,6 +25,7 @@ export const calculateSalary = ({
   location,
   joiningDate,
   attendedDates,
+  holidayDates = new Set(),
   month,
   year,
   today = todayIST(),
@@ -33,6 +37,7 @@ export const calculateSalary = ({
   let workingDays = 0;
   let paidDays = 0;
   let absentDays = 0;
+  let holidayDays = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     if (!isWorkingDay(rule, year, month, day)) continue;
@@ -41,7 +46,10 @@ export const calculateSalary = ({
     const date = `${year}-${pad(month)}-${pad(day)}`;
     if (joined && date < joined) continue;
 
-    if (date >= today || attendedDates.has(date)) {
+    if (holidayDates.has(date)) {
+      holidayDays++;
+      paidDays++;
+    } else if (date >= today || attendedDates.has(date)) {
       paidDays++;
     } else {
       absentDays++;
@@ -55,6 +63,7 @@ export const calculateSalary = ({
     workingDays,
     paidDays,
     absentDays,
+    holidayDays,
     deduction: baseSalary - net,
     net,
   };
@@ -112,6 +121,8 @@ export const generateMonthlySalary = async (month, year) => {
       .lte("date", `${y}-${pad(m)}-${pad(lastDay)}`)
       .order("id"),
   );
+  const holidayDates = await getHolidayDates(m, y);
+
   const attendedByUser = new Map();
   for (const row of attendance) {
     if (!attendedByUser.has(row.user_id)) attendedByUser.set(row.user_id, new Set());
@@ -162,6 +173,7 @@ export const generateMonthlySalary = async (month, year) => {
       location: emp.location,
       joiningDate: emp.joining_date,
       attendedDates: attendedByUser.get(emp.id) || new Set(),
+      holidayDates,
       month: m,
       year: y,
     });
@@ -280,6 +292,7 @@ export const markSalaryPaid = async (salaryId) => {
     location: emp?.location,
     joiningDate: emp?.joining_date,
     attendedDates: new Set(attendance.map((a) => String(a.date).slice(0, 10))),
+    holidayDates: await getHolidayDates(m, y),
     month: m,
     year: y,
   });

@@ -412,12 +412,16 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                   final isPresent = status == 'present';
                   final isLate = status == 'late';
                   final isOff = status == 'off';
+                  final isHoliday = status == 'holiday';
+                  final holidayName = record['holiday_name']?.toString();
                   final checkedIn = isPresent || isLate;
 
                   final Color sc = isPresent
                       ? kForest
                       : isLate
                       ? kWarn
+                      : isHoliday
+                      ? kDeepBlue
                       : isOff
                       ? kTealGray
                       : kDanger;
@@ -425,6 +429,8 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                       ? kSuccessBg
                       : isLate
                       ? kWarnBg
+                      : isHoliday
+                      ? kInfoBg
                       : isOff
                       ? kOffWhite
                       : kDangerBg;
@@ -444,7 +450,9 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              _formatDate(record['date']),
+                              isHoliday && holidayName != null
+                                  ? '${_formatDate(record['date'])} · $holidayName'
+                                  : _formatDate(record['date']),
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w600,
                                 color: kDeepBlue,

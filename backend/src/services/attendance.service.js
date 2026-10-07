@@ -2,6 +2,7 @@ import supabase from "../config/supabase.js";
 import { fetchAll } from "../utils/db.js";
 import { updateLocation } from "./location.service.js";
 import { weeklyOffRule, isWorkingDay } from "../utils/weeklyOff.js";
+import { getHolidays } from "./holiday.service.js";
 
 const IST_OFFSET = "+05:30";
 // After 10:45 AM IST a check-in is marked "late"
@@ -217,9 +218,10 @@ export const getAllAttendance = async () => {
 };
 
 // Day-by-day view of one month for one employee, including the days with no
-// check-in: "absent" on a working day, "off" on a weekly off. Uses the same
-// rules as salary calculation. Days before the joining date, and today or
-// later with no check-in yet, are left out.
+// check-in: "absent" on a working day, "off" on a weekly off, "holiday" on a
+// company holiday. Uses the same rules as salary calculation. Days before the
+// joining date, and today or later with no check-in yet, are left out
+// (holidays are listed even when they are still to come).
 export const getMonthCalendar = async (userId, month, year) => {
   const m = parseInt(month, 10);
   const y = parseInt(year, 10);
@@ -253,9 +255,19 @@ export const getMonthCalendar = async (userId, month, year) => {
   const today = getTodayDate();
   const joined = user.joining_date ? String(user.joining_date).slice(0, 10) : null;
   const rule = weeklyOffRule(user.location);
+  const holidayNames = new Map(
+    (await getHolidays(m, y)).map((h) => [h.date, h.name]),
+  );
 
   const days = [];
-  const summary = { present: 0, late: 0, absent: 0, off: 0, working_days: 0 };
+  const summary = {
+    present: 0,
+    late: 0,
+    absent: 0,
+    off: 0,
+    holiday: 0,
+    working_days: 0,
+  };
 
   for (let day = 1; day <= lastDay; day++) {
     const date = `${y}-${pad(m)}-${pad(day)}`;
@@ -270,13 +282,17 @@ export const getMonthCalendar = async (userId, month, year) => {
       continue;
     }
 
-    if (date >= today || (joined && date < joined)) continue;
+    if (joined && date < joined) continue;
 
-    const status = working ? "absent" : "off";
+    const holidayName = working ? holidayNames.get(date) : undefined;
+    if (!holidayName && date >= today) continue;
+
+    const status = holidayName ? "holiday" : working ? "absent" : "off";
     summary[status]++;
     days.push({
       date,
       status,
+      holiday_name: holidayName || null,
       user_id: userId,
       checked_in_at: null,
       checked_out_at: null,

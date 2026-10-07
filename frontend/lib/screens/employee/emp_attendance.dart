@@ -947,10 +947,13 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = record['status'] as String? ?? 'present';
     final isOff = status == 'off';
+    final isHoliday = status == 'holiday';
     Color sc = status == 'present'
         ? kForest
         : status == 'late'
         ? kWarn
+        : isHoliday
+        ? kDeepBlue
         : isOff
         ? kTealGray
         : kDanger;
@@ -958,6 +961,8 @@ class _HistoryRow extends StatelessWidget {
         ? kSuccessBg
         : status == 'late'
         ? kWarnBg
+        : isHoliday
+        ? kInfoBg
         : isOff
         ? kOffWhite
         : kDangerBg;
@@ -1001,6 +1006,8 @@ class _HistoryRow extends StatelessWidget {
                   ? Icons.check_circle_outline
                   : status == 'late'
                   ? Icons.watch_later_outlined
+                  : isHoliday
+                  ? Icons.celebration_outlined
                   : isOff
                   ? Icons.weekend_outlined
                   : Icons.cancel_outlined,
@@ -1022,7 +1029,9 @@ class _HistoryRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  isOff
+                  isHoliday
+                      ? (record['holiday_name']?.toString() ?? 'Holiday')
+                      : isOff
                       ? 'Weekly off'
                       : status == 'absent'
                       ? 'No check-in'

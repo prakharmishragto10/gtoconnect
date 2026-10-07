@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/colors.dart';
 import '../../services/salary_service.dart';
 import 'employee_history_screen.dart';
+import 'holidays_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SalaryScreen extends StatefulWidget {
@@ -185,6 +186,21 @@ class _SalaryScreenState extends State<SalaryScreen> {
     }
   }
 
+  // Holidays change who counts as absent, so unpaid salaries for the month
+  // are recalculated as soon as the list is edited.
+  Future<void> _openHolidays() async {
+    final changed = await showHolidaysDialog(
+      context,
+      month: _month,
+      year: _year,
+    );
+    if (!changed || !mounted) return;
+    if (_salaries.isNotEmpty) {
+      await _generateSalary();
+      _snack('Salaries recalculated with the updated holidays', kForest);
+    }
+  }
+
   Future<void> _generateSalary() async {
     setState(() => _loading = true);
     try {
@@ -226,81 +242,103 @@ class _SalaryScreenState extends State<SalaryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Salary Management',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: kDeepBlue,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: () => _changeMonth(-1),
-                        borderRadius: BorderRadius.circular(12),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2),
-                          child: Icon(
-                            Icons.chevron_left,
-                            size: 20,
-                            color: kDeepBlue,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        monthLabel,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kTealGray,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => _changeMonth(1),
-                        borderRadius: BorderRadius.circular(12),
-                        child: const Padding(
-                          padding: EdgeInsets.all(2),
-                          child: Icon(
-                            Icons.chevron_right,
-                            size: 20,
-                            color: kDeepBlue,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              // Shown for existing payroll too: it adds new employees and
-              // refreshes unpaid records, and never changes paid ones.
-              GestureDetector(
-                  onTap: _generateSalary,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: kDeepBlue,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Text(
-                      _salaries.isEmpty ? 'Generate' : 'Refresh',
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Salary Management',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: kDeepBlue,
                       ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          onTap: () => _changeMonth(-1),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(
+                              Icons.chevron_left,
+                              size: 20,
+                              color: kDeepBlue,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          monthLabel,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: kTealGray,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => _changeMonth(1),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: kDeepBlue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Tooltip(
+                message: 'Holidays for $monthLabel',
+                child: InkWell(
+                  onTap: _openHolidays,
+                  borderRadius: BorderRadius.circular(9),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: const Icon(
+                      Icons.celebration_outlined,
+                      size: 18,
+                      color: kDeepBlue,
                     ),
                   ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              // Shown for existing payroll too: it adds new employees and
+              // refreshes unpaid records, and never changes paid ones.
+              GestureDetector(
+                onTap: _generateSalary,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: kDeepBlue,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    _salaries.isEmpty ? 'Generate' : 'Refresh',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),

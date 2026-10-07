@@ -2,6 +2,7 @@ import supabase from "../config/supabase.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { isWorkingDate } from "../utils/weeklyOff.js";
+import { isHoliday } from "./holiday.service.js";
 
 export const loginUser = async (email, password) => {
   const { data: user, error } = await supabase
@@ -63,8 +64,9 @@ export const getMe = async (userId) => {
   return user;
 };
 
-// With `date` ("YYYY-MM-DD"), each employee also gets `is_working_day` for
-// that date, so attendance views can tell a weekly off from an absence.
+// With `date` ("YYYY-MM-DD"), each employee also gets `is_working_day` and
+// `is_holiday` for that date, so attendance views can tell a weekly off or a
+// company holiday from an absence.
 export const getAllUsers = async (date = null) => {
   const { data, error } = await supabase
     .from("users")
@@ -75,10 +77,16 @@ export const getAllUsers = async (date = null) => {
   if (error) throw new Error(error.message);
   if (!date) return data;
 
-  return data.map((user) => ({
-    ...user,
-    is_working_day: isWorkingDate(user.location, date),
-  }));
+  const holiday = await isHoliday(date);
+  return data.map((user) => {
+    const working = isWorkingDate(user.location, date);
+    return {
+      ...user,
+      is_working_day: working,
+      // A holiday on someone's weekly off is just their weekly off
+      is_holiday: holiday && working === true,
+    };
+  });
 };
 
 export const updatePassword = async (email, password) => {
