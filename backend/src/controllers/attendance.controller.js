@@ -7,6 +7,7 @@ import {
   getMonthlyReport,
   getAllAttendance,
   getMonthCalendar,
+  markPresent,
 } from "../services/attendance.service.js";
 
 export const checkin = async (req, res) => {
@@ -108,6 +109,19 @@ export const employeeCalendar = async (req, res) => {
     const { month, year } = req.query;
     const data = await getMonthCalendar(req.params.userId, month, year);
     res.json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const markEmployeePresent = async (req, res) => {
+  try {
+    const { userId, date } = req.body || {};
+    if (!userId || !date) {
+      return res.status(400).json({ error: "userId and date are required" });
+    }
+    const data = await markPresent(userId, date);
+    res.json({ message: "Marked present", attendance: data });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

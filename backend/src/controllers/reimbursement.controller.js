@@ -5,6 +5,8 @@ import {
   updateClaimStatus,
   getClaimById,
   getPendingTotal,
+  updateClaim,
+  deleteClaim,
 } from "../services/reimbursement.service.js";
 
 export const submit = async (req, res) => {
@@ -83,5 +85,28 @@ export const pendingTotal = async (req, res) => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+export const editClaim = async (req, res) => {
+  try {
+    const { category, amount, description } = req.body || {};
+    const data = await updateClaim(req.params.id, {
+      category,
+      amount,
+      description,
+    });
+    res.json({ message: "Claim updated", reimbursement: data });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const removeClaim = async (req, res) => {
+  try {
+    const data = await deleteClaim(req.params.id);
+    res.json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 };

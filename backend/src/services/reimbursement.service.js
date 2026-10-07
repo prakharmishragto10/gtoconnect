@@ -152,3 +152,70 @@ export const getPendingTotal = async () => {
   const total = data.reduce((sum, r) => sum + Number(r.amount), 0);
   return { count: data.length, total };
 };
+
+// Admin correction of a claim's details. A paid claim is a record of money
+// already sent, so it can no longer be edited (it can still be deleted).
+export const updateClaim = async (claimId, fields) => {
+  const { data: current, error: findError } = await supabase
+    .from("reimbursements")
+    .select("id, status")
+    .eq("id", claimId)
+    .maybeSingle();
+  if (findError) throw new Error(findError.message);
+  if (!current) throw new Error("Claim not found");
+  if (current.status === "paid") {
+    throw new Error("A paid claim cannot be edited");
+  }
+
+  const updates = {};
+  if (fields.category !== undefined) {
+    const category = String(fields.category ?? "").trim();
+    if (!category) throw new Error("Category is required");
+    updates.category = category;
+  }
+  if (fields.amount !== undefined) {
+    const amount = Number(fields.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error("Amount must be a positive number");
+    }
+    updates.amount = amount;
+  }
+  if (fields.description !== undefined) {
+    updates.description = String(fields.description ?? "").trim();
+  }
+  if (Object.keys(updates).length === 0) throw new Error("Nothing to update");
+
+  const { data, error } = await supabase
+    .from("reimbursements")
+    .update(updates)
+    .eq("id", claimId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  const [claim] = await attachSubmitters([data]);
+  return claim;
+};
+
+// Admin removal of a claim, whatever its status. The receipt image goes too.
+export const deleteClaim = async (claimId) => {
+  const { data, error } = await supabase
+    .from("reimbursements")
+    .delete()
+    .eq("id", claimId)
+    .select("id, receipt_url")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Claim not found");
+
+  // Best effort: a leftover file must not fail the delete
+  const prefix = receiptUrlPrefix();
+  if (typeof data.receipt_url === "string" && data.receipt_url.startsWith(prefix)) {
+    try {
+      const path = decodeURIComponent(data.receipt_url.slice(prefix.length).split("?")[0]);
+      await supabase.storage.from("receipts").remove([path]);
+    } catch (_) {}
+  }
+
+  return { message: "Claim deleted" };
+};

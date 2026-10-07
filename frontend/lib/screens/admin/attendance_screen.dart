@@ -30,10 +30,103 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   List<_EmpAttEntry> _entries = [];
   List<dynamic> _rawRecords = [];
 
+  // Only the admin may override attendance; sub-admins just view it
+  bool _isAdmin = false;
+
   @override
   void initState() {
     super.initState();
+    AuthService.getCurrentUser().then((user) {
+      if (mounted) setState(() => _isAdmin = user?.isAdmin ?? false);
+    });
     _loadData();
+  }
+
+  // Asks before overriding attendance. Returns true to go ahead.
+  Future<bool> _confirmMarkPresent(String name, String dateLabel) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Mark present?',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700,
+            color: kDeepBlue,
+            fontSize: 16,
+          ),
+        ),
+        content: Text(
+          '$name will be recorded as present on $dateLabel.',
+          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTealGray),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: kTealGray),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kForest,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Mark present',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  void _toast(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _markPresent(_EmpAttEntry entry) async {
+    final ok = await _confirmMarkPresent(
+      entry.name,
+      DateFormat('d MMM yyyy').format(_selectedDate),
+    );
+    if (!ok) return;
+    try {
+      await AttendanceService.markPresent(
+        entry.id,
+        _formatDateYMD(_selectedDate),
+      );
+      _toast('${entry.name} marked present', kForest);
+      await _loadData();
+    } catch (e) {
+      _toast(e.toString().replaceAll('Exception: ', ''), kDanger);
+    }
+  }
+
+  // Shown on Day-view cards for the admin, for today or a past date, on
+  // anyone who is not already present
+  void Function(_EmpAttEntry)? get _markPresentAction {
+    final today = DateTime.now();
+    final future = _selectedDate.isAfter(
+      DateTime(today.year, today.month, today.day, 23, 59, 59),
+    );
+    return (_isAdmin && !future) ? _markPresent : null;
   }
 
   String _formatDateYMD(DateTime dt) {
@@ -508,8 +601,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   _entries.isEmpty
                       ? _EmptyState(text: 'No employee records found')
                       : isDesktop
-                          ? _DesktopGrid(entries: _entries)
-                          : _MobileList(entries: _entries)
+                          ? _DesktopGrid(
+                              entries: _entries,
+                              onMarkPresent: _markPresentAction,
+                            )
+                          : _MobileList(
+                              entries: _entries,
+                              onMarkPresent: _markPresentAction,
+                            )
                 else
                   _rawRecords.isEmpty
                       ? _EmptyState(
@@ -641,7 +740,8 @@ class _EmpAttEntry {
 // ── Desktop: 2-column grid ────────────────────────────────────────────────────
 class _DesktopGrid extends StatelessWidget {
   final List<_EmpAttEntry> entries;
-  const _DesktopGrid({required this.entries});
+  final void Function(_EmpAttEntry)? onMarkPresent;
+  const _DesktopGrid({required this.entries, this.onMarkPresent});
 
   @override
   Widget build(BuildContext context) {
@@ -655,7 +755,8 @@ class _DesktopGrid extends StatelessWidget {
         childAspectRatio: 2.8,
       ),
       itemCount: entries.length,
-      itemBuilder: (_, i) => _EmployeeAttCard(entry: entries[i]),
+      itemBuilder: (_, i) =>
+          _EmployeeAttCard(entry: entries[i], onMarkPresent: onMarkPresent),
     );
   }
 }
@@ -663,12 +764,15 @@ class _DesktopGrid extends StatelessWidget {
 // ── Mobile: vertical list ─────────────────────────────────────────────────────
 class _MobileList extends StatelessWidget {
   final List<_EmpAttEntry> entries;
-  const _MobileList({required this.entries});
+  final void Function(_EmpAttEntry)? onMarkPresent;
+  const _MobileList({required this.entries, this.onMarkPresent});
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: entries.map((e) => _EmployeeAttCard(entry: e)).toList(),
+      children: entries
+          .map((e) => _EmployeeAttCard(entry: e, onMarkPresent: onMarkPresent))
+          .toList(),
     );
   }
 }
@@ -676,7 +780,8 @@ class _MobileList extends StatelessWidget {
 // ── Employee card (Day Mode) ──────────────────────────────────────────────────
 class _EmployeeAttCard extends StatelessWidget {
   final _EmpAttEntry entry;
-  const _EmployeeAttCard({required this.entry});
+  final void Function(_EmpAttEntry)? onMarkPresent;
+  const _EmployeeAttCard({required this.entry, this.onMarkPresent});
 
   @override
   Widget build(BuildContext context) {
@@ -821,6 +926,38 @@ class _EmployeeAttCard extends StatelessWidget {
                 _InfoChip(icon: Icons.login, label: 'In', value: entry.checkIn),
                 const SizedBox(width: 8),
                 _InfoChip(icon: Icons.logout, label: 'Out', value: entry.checkOut),
+                if (onMarkPresent != null && entry.status != 'present') ...[
+                  const Spacer(),
+                  InkWell(
+                    onTap: () => onMarkPresent!(entry),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kSuccessBg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check, size: 11, color: kForest),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Mark present',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: kForest,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],

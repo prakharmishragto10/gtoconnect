@@ -70,6 +70,14 @@ class AttendanceService {
     );
   }
 
+  // ── Admin override: mark an employee present on a date (yyyy-MM-dd) ────
+  static Future<void> markPresent(String userId, String date) async {
+    await Api.post(
+      '/api/attendance/mark-present',
+      body: {'userId': userId, 'date': date},
+    );
+  }
+
   // ── All / Filtered by date, month, year (admin) ─────────
   static Future<List<dynamic>> getAllToday({
     String? date,

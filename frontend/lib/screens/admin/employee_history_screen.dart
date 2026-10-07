@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/colors.dart';
 import '../../services/attendance_service.dart';
+import '../../services/auth_service.dart';
 
 enum EmpHistoryFilterMode { all, day, month, year }
 
@@ -42,10 +43,116 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Only the admin may override attendance; sub-admins just view it
+  bool _isAdmin = false;
+
   @override
   void initState() {
     super.initState();
+    AuthService.getCurrentUser().then((user) {
+      if (mounted) setState(() => _isAdmin = user?.isAdmin ?? false);
+    });
     _loadHistory();
+  }
+
+  // Asks before overriding attendance. Returns true to go ahead.
+  Future<bool> _confirmMarkPresent(String name, String dateLabel) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Mark present?',
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w700,
+            color: kDeepBlue,
+            fontSize: 16,
+          ),
+        ),
+        content: Text(
+          '$name will be recorded as present on $dateLabel.',
+          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: kTealGray),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: kTealGray),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kForest,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Mark present',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  void _toast(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _markPresent(DateTime date) async {
+    final ok = await _confirmMarkPresent(
+      widget.employeeName,
+      DateFormat('d MMM yyyy').format(date),
+    );
+    if (!ok) return;
+    try {
+      await AttendanceService.markPresent(
+        widget.employeeId,
+        _formatDateYMD(date),
+      );
+      _toast('Marked present', kForest);
+      await _loadHistory();
+    } catch (e) {
+      _toast(e.toString().replaceAll('Exception: ', ''), kDanger);
+    }
+  }
+
+  // App-bar action: pick any past date (or today) and mark it present
+  Future<void> _pickAndMarkPresent() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      helpText: 'Mark present on',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: kDeepBlue,
+            onPrimary: Colors.white,
+            onSurface: kDeepBlue,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null && mounted) await _markPresent(picked);
   }
 
   String _formatDateYMD(DateTime dt) {
@@ -228,6 +335,16 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
         iconTheme: const IconThemeData(color: kDeepBlue),
         elevation: 0,
         actions: [
+          if (_isAdmin)
+            IconButton(
+              onPressed: _loading ? null : _pickAndMarkPresent,
+              icon: const Icon(
+                Icons.event_available_outlined,
+                size: 20,
+                color: kForest,
+              ),
+              tooltip: 'Mark present on a date',
+            ),
           IconButton(
             onPressed: _loading ? null : _loadHistory,
             icon: const Icon(Icons.refresh, size: 20, color: kDeepBlue),
@@ -476,6 +593,38 @@ class _EmployeeHistoryScreenState extends State<EmployeeHistoryScreen> {
                             ),
                           ],
                         ),
+                        // Admin can turn any other day into a present day
+                        if (_isAdmin &&
+                            !isPresent &&
+                            DateTime.tryParse(
+                                  record['date']?.toString() ?? '',
+                                ) !=
+                                null)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () => _markPresent(
+                                DateTime.parse(record['date'].toString()),
+                              ),
+                              icon: const Icon(Icons.check, size: 14),
+                              label: Text(
+                                'Mark present',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                foregroundColor: kForest,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                minimumSize: const Size(0, 30),
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ),
                         // Absent and weekly-off days have no times to show
                         if (checkedIn) const SizedBox(height: 10),
                         if (checkedIn)

@@ -302,3 +302,65 @@ export const getMonthCalendar = async (userId, month, year) => {
   days.reverse(); // newest first, like the other history lists
   return { days, summary, joining_date: joined };
 };
+
+// Admin override: records the employee as present on `date` ("YYYY-MM-DD"),
+// whatever happened that day. An existing check-in keeps its times and only
+// has its status set to present; otherwise a record is created with the
+// standard 10:00 AM – 6:30 PM hours. Future dates are refused.
+export const markPresent = async (userId, date) => {
+  const day = String(date || "").trim();
+  const valid =
+    /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+    new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day;
+  if (!valid) throw new Error("A valid date is required");
+  if (day > getTodayDate()) {
+    throw new Error("Attendance cannot be marked for a future date");
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (userError) throw new Error(userError.message);
+  if (!user) throw new Error("Employee not found");
+
+  const { data: existing, error: existingError } = await supabase
+    .from("attendance")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("date", day)
+    .limit(1);
+  if (existingError) throw new Error(existingError.message);
+
+  if (existing.length > 0) {
+    const { data, error } = await supabase
+      .from("attendance")
+      .update({ status: "present" })
+      .eq("id", existing[0].id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  const now = new Date();
+  const start = new Date(`${day}T10:00:00${IST_OFFSET}`);
+  const end = new Date(`${day}T${AUTO_CHECKOUT_TIME}${IST_OFFSET}`);
+
+  const { data, error } = await supabase
+    .from("attendance")
+    .insert({
+      user_id: userId,
+      date: day,
+      // For today, never record a time that has not happened yet
+      checked_in_at: (now < start ? now : start).toISOString(),
+      checked_out_at: now >= end ? end.toISOString() : null,
+      status: "present",
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+};

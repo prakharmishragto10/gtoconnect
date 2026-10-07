@@ -43,6 +43,29 @@ class ReimbursementService {
     return data['reimbursement'];
   }
 
+  // Admin only. Paid claims cannot be edited.
+  static Future<Map<String, dynamic>> updateClaim(
+    String claimId, {
+    required String category,
+    required double amount,
+    required String description,
+  }) async {
+    final data = await Api.patch(
+      '/api/reimbursements/$claimId',
+      body: {
+        'category': category,
+        'amount': amount,
+        'description': description,
+      },
+    );
+    return data['reimbursement'];
+  }
+
+  // Admin only
+  static Future<void> deleteClaim(String claimId) async {
+    await Api.delete('/api/reimbursements/$claimId');
+  }
+
   static Future<Map<String, dynamic>> getPendingTotal() async {
     final data = await Api.get('/api/reimbursements/pending-total');
     return data;
