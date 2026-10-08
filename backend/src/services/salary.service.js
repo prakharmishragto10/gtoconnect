@@ -206,12 +206,18 @@ export const generateMonthlySalary = async (month, year) => {
   return results;
 };
 
+// What an employee may see of their own salary record: base salary, absences,
+// payment status and the slip. The pay calculation (paid days, deduction,
+// net) is for admin and sub-admin only, so it is not sent at all.
+const EMPLOYEE_SALARY_FIELDS =
+  "id, user_id, month, year, base_salary, reimbursements, absent_days, status, paid_at, slip_path, slip_uploaded_at, created_at";
+
 export const getMySalary = async (userId, month, year) => {
   const { m, y } = parsePeriod(month, year);
 
   const { data, error } = await supabase
     .from("salary_records")
-    .select("*")
+    .select(EMPLOYEE_SALARY_FIELDS)
     .eq("user_id", userId)
     .eq("month", m)
     .eq("year", y)
@@ -224,7 +230,7 @@ export const getMySalary = async (userId, month, year) => {
 export const getMySalaryHistory = async (userId) => {
   const { data, error } = await supabase
     .from("salary_records")
-    .select("*")
+    .select(EMPLOYEE_SALARY_FIELDS)
     .eq("user_id", userId)
     .order("year", { ascending: false })
     .order("month", { ascending: false });

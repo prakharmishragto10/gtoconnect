@@ -99,12 +99,9 @@ class _EmpSalaryState extends State<EmpSalary> {
     final selected = _salaries[_selectedIndex];
     final isPaid = selected['status'] == 'paid';
     final base = (selected['base_salary'] as num).toDouble();
-    final reimb = (selected['reimbursements'] as num).toDouble();
-    final deduction = (selected['deduction'] as num?)?.toDouble() ?? 0;
-    final net = SalaryService.netOf(selected);
+    // Employees see their base salary and absences only; the pay
+    // calculation is kept on the admin side.
     // Null on records generated before absences were tracked
-    final workingDays = selected['working_days'] as num?;
-    final paidDays = selected['paid_days'] as num?;
     final absentDays = selected['absent_days'] as num?;
     final hasSlip = selected['slip_path'] != null;
     final month = _monthName(selected['month'] as int);
@@ -124,7 +121,7 @@ class _EmpSalaryState extends State<EmpSalary> {
             ),
           ),
           Text(
-            'Your monthly breakdown',
+            'Your base salary and absences',
             style: GoogleFonts.plusJakartaSans(fontSize: 12, color: kTealGray),
           ),
           const SizedBox(height: 16),
@@ -215,14 +212,14 @@ class _EmpSalaryState extends State<EmpSalary> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Net Take-Home',
+                  'Base Salary',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: kBlueGray,
                   ),
                 ),
                 Text(
-                  '₹${net.toStringAsFixed(0)}',
+                  '₹${base.toStringAsFixed(0)}',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
@@ -237,7 +234,7 @@ class _EmpSalaryState extends State<EmpSalary> {
 
           // Breakdown
           Text(
-            'SALARY BREAKDOWN',
+            'THIS MONTH',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -264,50 +261,12 @@ class _EmpSalaryState extends State<EmpSalary> {
                 ),
                 const Divider(height: 20, color: kBorder),
                 _BreakdownRow(
-                  label: 'Paid days',
-                  value: workingDays == null
+                  label: 'Absent days',
+                  value: absentDays == null
                       ? '—'
-                      : '${paidDays ?? 0} of $workingDays',
-                  valueColor: kDeepBlue,
-                  icon: Icons.event_available_outlined,
-                ),
-                const Divider(height: 20, color: kBorder),
-                _BreakdownRow(
-                  label: absentDays == null
-                      ? 'Absence deduction'
-                      : 'Absent $absentDays day${absentDays == 1 ? '' : 's'}',
-                  value: '− ₹${deduction.toStringAsFixed(0)}',
-                  valueColor: kDanger,
+                      : '$absentDays day${absentDays == 1 ? '' : 's'}',
+                  valueColor: (absentDays ?? 0) > 0 ? kDanger : kForest,
                   icon: Icons.event_busy_outlined,
-                ),
-                const Divider(height: 20, color: kBorder),
-                _BreakdownRow(
-                  label: 'Reimbursements (paid separately)',
-                  value: '₹${reimb.toStringAsFixed(0)}',
-                  valueColor: kForest,
-                  icon: Icons.receipt_outlined,
-                ),
-                const Divider(height: 20, color: kBorder),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Net Payable',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: kDeepBlue,
-                      ),
-                    ),
-                    Text(
-                      '₹${net.toStringAsFixed(0)}',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: kDeepBlue,
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -396,9 +355,13 @@ class _EmpSalaryState extends State<EmpSalary> {
                           ),
                         ),
                         Text(
-                          isPaidS && s['paid_at'] != null
-                              ? 'Paid on ${(s['paid_at'] as String).substring(0, 10)}'
-                              : 'Payment pending',
+                          [
+                            isPaidS && s['paid_at'] != null
+                                ? 'Paid on ${(s['paid_at'] as String).substring(0, 10)}'
+                                : 'Payment pending',
+                            if (s['absent_days'] != null)
+                              'Absent ${s['absent_days']}',
+                          ].join(' · '),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             color: kTealGray,
@@ -411,7 +374,7 @@ class _EmpSalaryState extends State<EmpSalary> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${SalaryService.netOf(s).toStringAsFixed(0)}',
+                        '₹${(s['base_salary'] as num).toStringAsFixed(0)}',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
