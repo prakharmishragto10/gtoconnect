@@ -123,7 +123,10 @@ export const checkIn = async (userId, locationData = null) => {
   if (locationData && locationData.latitude != null && locationData.longitude != null) {
     try {
       await updateLocation(userId, locationData.latitude, locationData.longitude);
-    } catch (_) {}
+    } catch (err) {
+      // The check-in itself stands; log so a missing ping can be explained
+      console.error(`Check-in location not saved for ${userId}:`, err.message);
+    }
   }
 
   return data;

@@ -12,7 +12,27 @@ import {
 
 export const checkin = async (req, res) => {
   try {
-    const { latitude, longitude } = req.body || {};
+    // Check-in must carry the device's position. App versions from before
+    // location became mandatory send none, so they are told to update.
+    const body = req.body || {};
+    const latitude = Number(body.latitude);
+    const longitude = Number(body.longitude);
+    const hasLocation =
+      body.latitude != null &&
+      body.longitude != null &&
+      body.latitude !== "" &&
+      body.longitude !== "" &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      Math.abs(latitude) <= 90 &&
+      Math.abs(longitude) <= 180;
+    if (!hasLocation) {
+      return res.status(400).json({
+        error:
+          "Location is required to check in. Please update GTO Connect to the latest version and allow location access.",
+      });
+    }
+
     const data = await checkIn(req.user.id, { latitude, longitude });
     res.json({ message: "Checked in successfully", attendance: data });
   } catch (err) {
