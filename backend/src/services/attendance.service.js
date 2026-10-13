@@ -309,7 +309,7 @@ export const getMonthCalendar = async (userId, month, year) => {
 // Admin override: records the employee as present on `date` ("YYYY-MM-DD"),
 // whatever happened that day. An existing check-in keeps its times and only
 // has its status set to present; otherwise a record is created with the
-// standard 10:00 AM – 6:30 PM hours. Future dates are refused.
+// standard 10:30 AM – 6:30 PM hours. Future dates are refused.
 export const markPresent = async (userId, date) => {
   const day = String(date || "").trim();
   const valid =
@@ -348,7 +348,7 @@ export const markPresent = async (userId, date) => {
   }
 
   const now = new Date();
-  const start = new Date(`${day}T10:00:00${IST_OFFSET}`);
+  const start = new Date(`${day}T10:30:00${IST_OFFSET}`);
   const end = new Date(`${day}T${AUTO_CHECKOUT_TIME}${IST_OFFSET}`);
 
   const { data, error } = await supabase
