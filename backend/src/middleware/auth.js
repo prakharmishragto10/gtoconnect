@@ -24,11 +24,19 @@ const auth = async (req, res, next) => {
   // immediately and role changes take effect without waiting for token expiry.
   let user;
   try {
-    const result = await supabase
+    let result = await supabase
       .from("users")
-      .select("id, role")
+      .select("id, role, password_changed_at")
       .eq("id", decoded.id)
       .maybeSingle();
+    // Until migration 003 is run the column is missing: keep working without it
+    if (result.error && /password_changed_at/.test(result.error.message)) {
+      result = await supabase
+        .from("users")
+        .select("id, role")
+        .eq("id", decoded.id)
+        .maybeSingle();
+    }
     if (result.error) throw new Error(result.error.message);
     user = result.data;
   } catch (err) {
@@ -37,6 +45,19 @@ const auth = async (req, res, next) => {
   }
   if (!user) {
     return res.status(401).json({ error: "Account no longer exists" });
+  }
+
+  // A token issued before the last password change is no longer valid.
+  // iat is in whole seconds, so compare at that precision.
+  if (user.password_changed_at && decoded.iat) {
+    const changedAt = Math.floor(
+      new Date(user.password_changed_at).getTime() / 1000,
+    );
+    if (decoded.iat < changedAt) {
+      return res
+        .status(401)
+        .json({ error: "Password was changed. Please sign in again." });
+    }
   }
 
   req.user = { ...decoded, role: user.role };

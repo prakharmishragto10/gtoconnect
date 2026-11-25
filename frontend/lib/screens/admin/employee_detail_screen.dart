@@ -191,6 +191,17 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _snack('Profile updated', kForest);
   }
 
+  Future<void> _openResetPassword() async {
+    final done = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ResetPasswordDialog(
+        userId: _emp['id'].toString(),
+        name: _orDash('name'),
+      ),
+    );
+    if (done == true) _snack('Password reset', kForest);
+  }
+
   void _openAttendance() {
     Navigator.push(
       context,
@@ -267,7 +278,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
               const DashSectionHeader('Information'),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
                 decoration: dashCardDecoration(),
                 child: Column(
                   children: [
@@ -339,6 +353,53 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                               ),
                               Text(
                                 'Check-ins, late days and check-out times',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  color: kTealGray,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: kTealGray),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Reset password ──────────────────────────────────────────
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _openResetPassword,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Ink(
+                    padding: const EdgeInsets.all(14),
+                    decoration: dashCardDecoration(),
+                    child: Row(
+                      children: [
+                        const _IconChip(
+                          icon: Icons.lock_reset_rounded,
+                          color: kShellBlue,
+                          bg: kInfoBg,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Reset password',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: kShellBlueDark,
+                                ),
+                              ),
+                              Text(
+                                'Set a new sign-in password for this employee',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 11,
                                   color: kTealGray,
@@ -673,7 +734,11 @@ class _InfoRow extends StatelessWidget {
               IconButton(
                 onPressed: onCopy,
                 tooltip: 'Copy $label',
-                icon: const Icon(Icons.copy_rounded, size: 17, color: kTealGray),
+                icon: const Icon(
+                  Icons.copy_rounded,
+                  size: 17,
+                  color: kTealGray,
+                ),
               ),
           ],
         ),
@@ -697,7 +762,9 @@ class _EditProfileForm extends StatefulWidget {
 class _EditProfileFormState extends State<_EditProfileForm> {
   final _formKey = GlobalKey<FormState>();
   late final _name = TextEditingController(text: _initial('name'));
-  late final _designation = TextEditingController(text: _initial('designation'));
+  late final _designation = TextEditingController(
+    text: _initial('designation'),
+  );
   late final _location = TextEditingController(text: _initial('location'));
   late final _salary = TextEditingController(text: _initial('base_salary'));
   late final _upi = TextEditingController(text: _initial('upi_id'));
@@ -805,9 +872,7 @@ class _EditProfileFormState extends State<_EditProfileForm> {
       hint: '15000',
       icon: Icons.currency_rupee,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-      ],
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
       validator: (v) {
         final t = (v ?? '').trim();
         if (t.isEmpty) return null;
@@ -1169,4 +1234,185 @@ class _GroupLabel extends StatelessWidget {
       ),
     ),
   );
+}
+
+// ── Reset password dialog ────────────────────────────────────────────────────
+class _ResetPasswordDialog extends StatefulWidget {
+  final String userId;
+  final String name;
+
+  const _ResetPasswordDialog({required this.userId, required this.name});
+
+  @override
+  State<_ResetPasswordDialog> createState() => _ResetPasswordDialogState();
+}
+
+class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _obscured = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      // Trimmed, like creation and login, so the saved password matches what
+      // the employee types
+      await AuthService.resetEmployeePassword(
+        widget.userId,
+        _password.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  InputDecoration _decoration(String hint) {
+    OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: c, width: w),
+    );
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: GoogleFonts.plusJakartaSans(fontSize: 14, color: kBlueGray),
+      prefixIcon: const Icon(Icons.lock_outline, size: 19, color: kShellBlue),
+      suffixIcon: IconButton(
+        icon: Icon(
+          _obscured ? Icons.visibility_off : Icons.visibility,
+          size: 19,
+          color: kTealGray,
+        ),
+        onPressed: () => setState(() => _obscured = !_obscured),
+      ),
+      filled: true,
+      fillColor: const Color(0xFFF5F8FA),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border(const Color(0xFFE1E9EF)),
+      enabledBorder: border(const Color(0xFFE1E9EF)),
+      focusedBorder: border(kShellBlue, 1.6),
+      errorBorder: border(kDanger),
+      focusedErrorBorder: border(kDanger, 1.6),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text(
+        'Reset password',
+        style: GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.w700,
+          color: kShellBlueDark,
+        ),
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Set a new password for "${widget.name}". Share it with them '
+                'so they can sign in.',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: kTealGray,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _password,
+                obscureText: _obscured,
+                autofocus: true,
+                style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                decoration: _decoration('New password'),
+                validator: (v) => (v == null || v.trim().length < 8)
+                    ? 'Password must be at least 8 characters'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _confirm,
+                obscureText: _obscured,
+                style: GoogleFonts.plusJakartaSans(fontSize: 14),
+                decoration: _decoration('Confirm password'),
+                validator: (v) => v?.trim() != _password.text.trim()
+                    ? 'Passwords do not match'
+                    : null,
+                onFieldSubmitted: (_) => _saving ? null : _submit(),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: kDanger,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.plusJakartaSans(color: kTealGray),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kShellBlue,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  'Reset',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
 }

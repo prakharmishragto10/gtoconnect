@@ -110,6 +110,7 @@ export const updatePassword = async (email, password) => {
     .from("users")
     .update({
       password_hash: hashedPassword,
+      password_changed_at: new Date().toISOString(),
     })
     .eq("id", user.id);
 
@@ -222,4 +223,32 @@ export const updateEmployee = async (userId, fields) => {
 
   if (error) throw new Error(error.message);
   return { message: "Employee updated successfully", user: data };
+};
+
+// Admin sets a new password for an employee. Like edit and delete, this route
+// never touches admin or sub-admin accounts.
+export const resetEmployeePassword = async (userId, password) => {
+  if (typeof password !== "string" || password.trim().length < 8) {
+    throw new Error("Password must be at least 8 characters");
+  }
+
+  const { data: target, error: targetError } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (targetError || !target) throw new Error("User not found");
+  if (target.role !== "employee") {
+    throw new Error("Only employee passwords can be reset here");
+  }
+
+  const password_hash = await bcrypt.hash(password, 10);
+  // Stamping the change signs out every device still holding an older token
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash, password_changed_at: new Date().toISOString() })
+    .eq("id", userId);
+
+  if (error) throw new Error(error.message);
+  return { message: "Password reset successfully" };
 };

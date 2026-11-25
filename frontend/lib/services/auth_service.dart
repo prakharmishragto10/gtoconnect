@@ -12,6 +12,7 @@ class AuthService {
   static Future<UserModel> login(String email, String password) async {
     final data = await Api.post(
       '/api/auth/login',
+      // Passwords are trimmed when created and reset, so trim here too
       body: {'email': email.trim().toLowerCase(), 'password': password.trim()},
     );
 
@@ -98,6 +99,17 @@ class AuthService {
 
   static Future<void> deleteEmployee(String userId) async {
     await Api.delete('/api/auth/employees/$userId');
+  }
+
+  /// Admin sets a new password for an employee account.
+  static Future<void> resetEmployeePassword(
+    String userId,
+    String password,
+  ) async {
+    await Api.patch(
+      '/api/auth/employees/$userId/password',
+      body: {'password': password},
+    );
   }
 
   static Future<Map<String, dynamic>> updateEmployee(

@@ -12,7 +12,9 @@ import 'subadmin/subadmin_home.dart';
 const _ink = Color(0xFF1F1F1F);
 const _muted = Color(0xFF5F6B76);
 const _hint = Color(0xFF8C97A1);
-const _fieldBorder = Color(0xFF4A545C);
+const _fieldBorder = Color(0xFFB7C4D1);
+const _brand = Color(0xFF0B2545); // matches kShellBlue in the app shell
+const _errorRed = Color(0xFFA32D2D);
 
 // ─── SKY BACKGROUND ──────────────────────────────────────────────────────────
 // Painted rather than loaded from an image so the login screen works offline
@@ -98,7 +100,8 @@ class _SkyPainter extends CustomPainter {
       ..color = const Color(0xFF9FB6CC).withValues(alpha: 0.30)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, unit * 0.022);
     final lit = Paint()..color = Colors.white.withValues(alpha: 0.86);
-    final warm = Paint()..color = const Color(0xFFFBF3E8).withValues(alpha: 0.5);
+    final warm = Paint()
+      ..color = const Color(0xFFFBF3E8).withValues(alpha: 0.5);
 
     for (final (x, y, r) in _puffs) {
       final c = Offset(x * w, y * h);
@@ -135,6 +138,24 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   bool _obscure = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Drop a stale error as soon as the user starts correcting it
+    // Controllers also notify on taps and cursor moves, so compare the text
+    void clearOnEdit(TextEditingController ctrl) {
+      var last = ctrl.text;
+      ctrl.addListener(() {
+        if (ctrl.text == last) return;
+        last = ctrl.text;
+        if (_error != null) setState(() => _error = null);
+      });
+    }
+
+    clearOnEdit(_emailCtrl);
+    clearOnEdit(_passCtrl);
+  }
 
   @override
   void dispose() {
@@ -212,13 +233,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: SingleChildScrollView(
                       keyboardDismissBehavior:
                           ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: mq.size.width < 400 ? 14 : 20,
                         vertical: 24,
                       ),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 440),
-                        child: _buildGlassCard(),
+                        child: _buildGlassCard(compact: mq.size.width < 400),
                       ),
                     ),
                   ),
@@ -232,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // ── Frosted card ──────────────────────────────────────────────────────────
-  Widget _buildGlassCard() {
+  Widget _buildGlassCard({required bool compact}) {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(36),
@@ -259,9 +280,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               borderRadius: BorderRadius.circular(36),
-              border: Border.all(color: Colors.white, width: 6),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.9),
+                width: 1.5,
+              ),
             ),
-            padding: const EdgeInsets.fromLTRB(32, 40, 32, 44),
+            padding: compact
+                ? const EdgeInsets.fromLTRB(22, 32, 22, 30)
+                : const EdgeInsets.fromLTRB(36, 40, 36, 40),
             child: AutofillGroup(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -269,8 +295,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Center(
                     child: Container(
-                      width: 72,
-                      height: 72,
+                      width: 80,
+                      height: 80,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF7F3EA),
@@ -290,31 +316,44 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  Text(
+                    'GTO CONNECT',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2.4,
+                      color: _brand,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   Text(
                     'Welcome back',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: _ink,
+                      fontWeight: FontWeight.w800,
+                      color: _brand,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Please enter your details to sign in.',
+                    'Sign in with your work email to continue.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       color: _muted,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   _GlassField(
-                    label: 'E-Mail Address',
+                    label: 'Email',
                     controller: _emailCtrl,
                     focusNode: _emailFocus,
-                    hint: 'Enter your email...',
+                    hint: 'name@company.com',
+                    icon: Icons.mail_outline_rounded,
+                    hasError: _error != null,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [
                       AutofillHints.email,
@@ -323,12 +362,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     textInputAction: TextInputAction.next,
                     onSubmitted: (_) => _passFocus.requestFocus(),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 18),
                   _GlassField(
                     label: 'Password',
                     controller: _passCtrl,
                     focusNode: _passFocus,
                     hint: 'Enter your password',
+                    icon: Icons.lock_outline_rounded,
+                    hasError: _error != null,
                     obscure: _obscure,
                     autofillHints: const [AutofillHints.password],
                     textInputAction: TextInputAction.done,
@@ -341,7 +382,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
                         size: 20,
-                        color: _fieldBorder,
+                        color: _muted,
                       ),
                     ),
                   ),
@@ -349,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 14),
                     _buildError(),
                   ],
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 24),
                   _buildSignInButton(),
                 ],
               ),
@@ -376,11 +417,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.only(top: 1),
-              child: Icon(
-                Icons.error_outline,
-                size: 16,
-                color: Color(0xFFA32D2D),
-              ),
+              child: Icon(Icons.error_outline, size: 16, color: _errorRed),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -388,7 +425,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 _error!,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  color: const Color(0xFFA32D2D),
+                  color: _errorRed,
                 ),
               ),
             ),
@@ -405,13 +442,13 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: _loading ? null : _login,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _ink,
+          backgroundColor: _brand,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: _ink.withValues(alpha: 0.7),
+          disabledBackgroundColor: _brand.withValues(alpha: 0.7),
           disabledForegroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
         child: _loading
@@ -446,6 +483,8 @@ class _GlassField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final Widget? suffix;
+  final IconData icon;
+  final bool hasError;
 
   const _GlassField({
     required this.label,
@@ -458,10 +497,12 @@ class _GlassField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.suffix,
+    required this.icon,
+    this.hasError = false,
   });
 
   OutlineInputBorder _border(Color color, double width) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(14),
     borderSide: BorderSide(color: color, width: width),
   );
 
@@ -473,12 +514,12 @@ class _GlassField extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
             color: _ink,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 7),
         TextField(
           controller: controller,
           focusNode: focusNode,
@@ -494,20 +535,28 @@ class _GlassField extends StatelessWidget {
             fontWeight: FontWeight.w500,
             color: _ink,
           ),
-          cursorColor: _ink,
+          cursorColor: _brand,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: GoogleFonts.plusJakartaSans(fontSize: 15, color: _hint),
+            prefixIcon: Icon(
+              icon,
+              size: 20,
+              color: hasError ? _errorRed : _muted,
+            ),
             suffixIcon: suffix,
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.25),
+            fillColor: Colors.white.withValues(alpha: 0.75),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 18,
+              horizontal: 16,
               vertical: 15,
             ),
             border: _border(_fieldBorder, 1.2),
-            enabledBorder: _border(_fieldBorder, 1.2),
-            focusedBorder: _border(_ink, 1.8),
+            enabledBorder: _border(
+              hasError ? _errorRed.withValues(alpha: 0.6) : _fieldBorder,
+              1.2,
+            ),
+            focusedBorder: _border(hasError ? _errorRed : _brand, 1.8),
           ),
         ),
       ],

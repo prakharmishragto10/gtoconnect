@@ -6,6 +6,7 @@ import {
   createEmployee,
   deleteEmployee,
   updateEmployee,
+  resetEmployeePassword,
 } from "../services/auth.service.js";
 
 export const login = async (req, res) => {
@@ -122,6 +123,19 @@ export const editEmployee = async (req, res) => {
     const { userId } = req.params;
     if (!userId) return res.status(400).json({ error: "userId is required" });
     const result = await updateEmployee(userId, req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { password } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+    if (!password) return res.status(400).json({ error: "Password is required" });
+    const result = await resetEmployeePassword(userId, password);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
